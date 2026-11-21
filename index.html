@@ -237,6 +237,7 @@ tr.grp td{background:var(--card);font-weight:700;font-size:.75rem;text-align:lef
 .gms{display:grid;gap:.3rem}.gm{display:grid;grid-template-columns:1fr auto;gap:.1rem .5rem;align-items:center;border:1px solid var(--line);border-radius:.6rem;padding:.4rem .6rem}.gm b{font-size:.875rem}.gm span{grid-column:1;font-size:.8125rem;color:var(--mute)}.gm button{grid-row:1/3;grid-column:2;min-height:2.2rem}
 .gadd{display:grid;gap:.4rem;border:1px dashed var(--line);border-radius:.6rem;padding:.6rem}
 #mapM{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex}#mapM[hidden]{display:none!important}.mbox{flex:1;display:flex;flex-direction:column;gap:.4rem;padding:.6rem;min-height:0}.mrow{display:flex;gap:.4rem}.mrow input{flex:1}#mapRes{display:grid;gap:.25rem}#mapRes button{text-align:left;font-size:.8125rem;min-height:2.3rem}.mwrap{position:relative;flex:1;min-height:40vh;border-radius:.75rem;overflow:hidden}#mapEl{position:absolute;inset:0}.mpin{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:500;font-size:2rem;font-weight:800;color:#d92d20;pointer-events:none;text-shadow:0 0 3px #fff}
+.evsel{margin:0 0 .4rem}.evsel select{width:100%;min-height:2.2rem;font-weight:800;border-radius:.6rem;border:1px solid var(--deep);background:var(--deep);color:#fff;padding:0 .6rem}.evsel:empty{display:none}
 .cist{font-weight:700;font-size:.875rem}.cist.on{color:light-dark(#0f6b35,#7ee2a0)}.cist.off{color:var(--mute)}
 
 /* 알림 · 하단 탭 */
@@ -300,6 +301,7 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 
 <section class="view" data-view="att" id="attBox">
 <div class="sim simtop"><button class="pri" data-go="board">← 작전판으로</button></div>
+<div class="evsel"></div>
 <h2 id="asum">오늘 출석 체크</h2>
 <div class="sim latefix" id="lateFix"></div>
 <p class="hint">도착한 순서대로 누르면 번호가 붙어요. 경기 중 출석한 사람을 다시 누르면 귀가 처리돼요.</p>
@@ -317,6 +319,7 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 </section>
 
 <section class="view board" data-view="board" hidden>
+<div class="evsel"></div>
 <div class="tabs" id="tabs" role="tablist" aria-label="쿼터 선택"></div>
 <div class="qrow">
 <details class="qopt" id="qopt"><summary id="qsum"></summary>
@@ -370,6 +373,7 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 </section>
 
 <section class="view" data-view="stat" hidden>
+<div class="evsel"></div>
 <h2>출전 현황</h2>
 <p id="fair"></p>
 <div class="arow2"><input type="text" id="sfind" placeholder="이름이나 직책으로 찾기" aria-label="현황 검색"></div>
@@ -405,15 +409,16 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 <h2>설정</h2>
 <div class="btns" style="margin:0 0 .5rem"><button class="pri" id="toSimple2">간편 모드로 보기</button></div>
 <details class="sec" open><summary>경기</summary><div>
+<div class="evsel"></div>
 <p class="cist" id="gInfo" style="margin:0 0 .5rem"></p>
 <div class="ctrl">
 <label><span class="fl">기본 경기 방식</span><select id="mode"><option value="match">상대팀 경기</option><option value="scrim">자체전 (A팀 vs B팀)</option></select></label>
 <label><span class="fl">쿼터 수</span><select id="nq"></select></label>
 <label><span class="fl">포지션 글자</span><select id="pdSel"><option value="big">크게 (GK·DF·MF·FW)</option><option value="detail">세부 (CB·LB·CM·ST…)</option></select></label>
-<label><span class="fl">날짜</span><input type="date" id="gdate"></label>
+<label hidden><span class="fl">날짜</span><input type="date" id="gdate"></label>
 </div>
-<div class="btns" style="margin-top:.5rem"><button class="pri" id="finishBtn">이번 경기 마치고 새 경기 준비</button><button id="resetBtn">쿼터 기록만 비우기 (출석 유지)</button></div>
-<p class="hint">"마치고 새 경기 준비"를 누르면 출석·쿼터가 비워지고, 지난 경기는 기록 탭에 남아요.</p>
+<div class="btns" style="margin-top:.5rem"><button class="pri" id="finishBtn" hidden>이번 경기 마치고 새 경기 준비</button><button id="resetBtn">쿼터 기록만 비우기 (출석 유지)</button></div>
+<p class="hint">경기는 위에서 골라요. 경기마다 출석·작전판·현황이 따로 저장되고, 시작한 경기는 기록 탭에 남아요. 경기 등록은 아래 "출석·경기 일정"에서 해요.</p>
 </div></details>
 <details class="sec"><summary>출석·경기 일정 <small id="sCi"></small></summary><div><div id="ciBox"></div></div></details>
 <details class="sec"><summary>말판 사진 읽기 <small id="sAi"></small></summary><div><div id="aiBox"></div></div></details>
@@ -831,12 +836,35 @@ function renderAtt(){
   }else html=list.map(btn).join('');
   $('att').innerHTML=html||(S.players.length?'<p class="empty-note">조건에 맞는 회원이 없어요.</p>':'<p class="empty-note">명단이 비어 있어요. <b>설정</b> 탭에서 서버에 연결하거나, 백업 글을 붙여 넣어 복원하거나, 명단 편집에서 회원을 추가해 주세요.</p>');
 }
-function schedOn(ds){try{ciNorm()}catch(e){return null}const sc=S.sched,g=sc.games.find(x=>x.date===ds);if(g)return{date:ds,from:g.from,to:g.to,place:g.place||sc.home,opp:g.opp||'',mode:g.mode||'match',reg:true};const w=sc.weekly[new Date(ds+'T00:00').getDay()];return w?{date:ds,from:w.from,to:w.to,place:sc.home,opp:'',mode:null,reg:false}:null}
-function schedNext(){for(let i=0;i<=60;i++){const d=new Date();d.setDate(d.getDate()+i);const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),e=schedOn(ds);if(e)return e}return null}
+function evDate(i){const d=new Date();d.setDate(d.getDate()+i);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function evList(){try{ciNorm()}catch(e){return[]}const sc=S.sched,out=[];
+  sc.games.forEach(g=>{if(!g.id)g.id='e'+g.date.replace(/-/g,'')+Math.random().toString(36).slice(2,6)});
+  const reg=sc.games.filter(g=>g.date>=today());
+  reg.forEach(g=>out.push({id:g.id,date:g.date,from:g.from,to:g.to,place:g.place||sc.home,opp:g.opp||'',mode:g.mode||'match',reg:true}));
+  for(let i=0;i<22;i++){const ds=evDate(i),w=sc.weekly[new Date(ds+'T00:00').getDay()];if(w&&!reg.some(g=>g.date===ds))out.push({id:'w'+ds,date:ds,from:w.from,to:w.to,place:sc.home,opp:'',mode:null,reg:false})}
+  return out.sort((x,y)=>x.date.localeCompare(y.date)||x.from.localeCompare(y.from))}
+function evCur(){return evList().find(e=>e.id===S.evId)||null}
+function evLabel(e){const d=new Date(e.date+'T00:00'),day=e.date===today()?'오늘':`${d.getMonth()+1}/${d.getDate()}(${'일월화수목금토'[d.getDay()]})`;return `${day} ${e.from} · ${e.opp?'vs '+e.opp:e.mode==='scrim'?'자체전':e.reg?'경기':'정기 경기'}${e.opp&&e.mode==='scrim'?' 자체전':''}`}
 function schedTxt(e){const d=new Date(e.date+'T00:00');return `${d.getMonth()+1}/${d.getDate()}(${'일월화수목금토'[d.getDay()]}) ${e.from}~${e.to} · ${e.place.name}${e.opp?' · vs '+e.opp:''}${e.mode==='scrim'?' · 자체전':''}`}
-function schedApply(){const e=schedOn(S.date);S.opp=e?e.opp:'';if(e&&e.reg&&e.mode!==S.mode&&!S.q.some((q,i)=>counted(i))){S.mode=e.mode;S.q.forEach(q=>{if(!q.started&&!filled(q)&&q.mode!==S.mode){q.mode=S.mode;resetPos(q);q.slots=emptyFor(q);q.b=emptyFor(q)}})}}
+function evStash(){if(!S.evId)return;if(!S.work||typeof S.work!=='object')S.work={};const att={};S.players.forEach(p=>{if(p.here||p.left)att[p.id]={here:!!p.here,arr:p.arr||null,left:p.left||null}});S.work[S.evId]={date:S.date,gid:S.gid,q:S.q,cur:S.cur,nq:S.nq,mode:S.mode,att,ciDone:S.ciDone}}
+function evLoad(e){const w=S.work&&S.work[e.id];S.evId=e.id;S.date=e.date;S.opp=e.opp||'';S.gid=(w&&w.gid)||'g_'+e.id;
+  S.players.forEach(p=>{const a=w&&w.att&&w.att[p.id];p.here=!!(a&&a.here);p.arr=a?a.arr:null;p.left=a?a.left:null});
+  if(w){S.q=w.q;S.cur=w.cur;S.nq=w.nq;S.mode=w.mode;S.ciDone=w.ciDone||{date:'',ids:[]};delete S.work[e.id]}
+  else{if(e.mode)S.mode=e.mode;S.nq=9;S.q=[];S.cur=0;S.ciDone={date:'',ids:[]}}
+  sel=null}
+function evSwitch(id){const e=evList().find(x=>x.id===id);if(!e||id===S.evId)return;snap();evStash();evLoad(e);norm();render();try{if(CI.docs)ciApply(CI.docs)}catch(err){}say(`${evLabel(e)} 경기로 바꿨어요.`)}
+function evEnsure(){const L=evList();if(!L.length)return;const e=L.find(x=>x.id===S.evId);
+  if(e){S.date=e.date;S.opp=e.opp||'';return}
+  if(!S.evId){const same=L.find(x=>x.date===S.date);if(same){S.evId=same.id;S.opp=same.opp||'';if(!S.q.some((q,i)=>counted(i)))S.gid='g_'+same.id;return}}
+  try{snap()}catch(err){}
+  S.evId='';evLoad(L[0]);norm();
+  if(S.work)Object.keys(S.work).forEach(k=>{if(!S.work[k]||S.work[k].date<today())delete S.work[k]})}
+function schedApply(){evEnsure();const e=evCur();if(e&&e.reg&&e.mode!==S.mode&&!S.q.some((q,i)=>counted(i))){S.mode=e.mode;S.q.forEach(q=>{if(!q.started&&!filled(q)&&q.mode!==S.mode){q.mode=S.mode;resetPos(q);q.slots=emptyFor(q);q.b=emptyFor(q)}})}}
+function renderEv(){const L=evList(),h=L.length?`<select data-ev aria-label="경기 선택">${L.map(e=>`<option value="${esc(e.id)}" ${e.id===S.evId?'selected':''}>${esc(evLabel(e))}</option>`).join('')}</select>`:'';document.querySelectorAll('.evsel').forEach(x=>{if(x.dataset.h!==h){x.dataset.h=h;x.innerHTML=h}})}
+document.addEventListener('change',e=>{const t=e.target.closest('[data-ev]');if(t)evSwitch(t.value)});
 function renderCtrl(){
-  {const e=schedOn(S.date),n=e?null:schedNext(),gi=$('gInfo');if(gi){gi.className='cist '+(e?'on':'off');gi.textContent=e?(e.reg?'등록된 경기 · ':'정기 경기 · ')+schedTxt(e):'이 날짜에는 경기 일정이 없어요'+(n?' · 다음 '+schedTxt(n):'')}}
+  {const e=evCur(),gi=$('gInfo');if(gi){gi.className='cist '+(e?'on':'off');gi.textContent=e?(e.reg?'등록된 경기 · ':'정기 경기 · ')+schedTxt(e):'등록된 경기 일정이 없어요. 아래 "출석·경기 일정"에서 요일이나 경기를 등록해 주세요.'}}
+  renderEv();
   $('pdSel').value=S.pd==='detail'?'detail':'big';
   $('gdate').value=S.date;
   $('mode').value=S.mode;
@@ -896,7 +924,7 @@ function renderHist(){
     return `<div class="hcard ${open?'open':''}"><button class="hhead" data-hd="${g.gid}"><b>${dLabel(g.date)}${g.opp?' · vs '+esc(g.opp):''}${g.gid===S.gid?' <span class="now">진행 중</span>':''}</b><small>${(n=>n===g.q.length?'자체전':n?`상대팀 경기 · 자체전 ${n}쿼터`:'상대팀 경기')(g.q.filter(q=>q.mode==='scrim'||(!q.mode&&g.mode==='scrim')).length)} · 출석 ${here}명 · ${g.q.length}쿼터 · 최대 연속 대기 ${mx}회</small></button>
     ${open?`${histTable(g)}<div class="btns" style="margin-top:10px"><button data-hcopy="${g.gid}">이 날 기록 글로 복사</button><button class="del" data-hdel="${g.gid}">이 날짜 기록 삭제</button></div>`:''}</div>`}).join('')||'<p class="empty-note">아직 저장된 경기가 없어요.</p>';
 }
-function render(){$('legA').innerHTML=$('legB').innerHTML=LEG;norm();snap();renderHist();renderNav();renderStart();renderTabs();renderAges();renderTeamSw();renderBoard();spread();renderBench();renderTable();renderRoster();renderAtt();renderCtrl();renderSimple();if($('photoMenu')){$('photoMenu').hidden=!photoOK();$('photoMenuCam').hidden=!photoOK()}save();try{if(SY.ref)ciTick()}catch(e){}}
+function render(){try{evEnsure()}catch(e){}$('legA').innerHTML=$('legB').innerHTML=LEG;norm();snap();renderHist();renderNav();renderStart();renderTabs();renderAges();renderTeamSw();renderBoard();spread();renderBench();renderTable();renderRoster();renderAtt();renderCtrl();renderSimple();if($('photoMenu')){$('photoMenu').hidden=!photoOK();$('photoMenuCam').hidden=!photoOK()}save();try{if(SY.ref)ciTick()}catch(e){}}
 
 function addNames(text){
   let added=0,updated=0;
@@ -1126,14 +1154,14 @@ $('attClear').addEventListener('click',e=>{
   if(!atArm){atArm=true;e.target.textContent='한 번 더 누르면 출석이 모두 해제돼요';setTimeout(()=>{atArm=false;e.target.textContent='모두 해제'},4000);return}
   atArm=false;e.target.textContent='모두 해제';S.players.forEach(p=>{p.here=false;p.arr=null;p.left=null});render();
 });
-$('gdate').addEventListener('change',e=>{if(/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)){S.date=e.target.value;schedApply();render();say(`경기 날짜를 ${dLabel(S.date)}로 바꿨어요.`)}});
+$('gdate').addEventListener('change',e=>{if(/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)){S.date=e.target.value;render();say(`경기 날짜를 ${dLabel(S.date)}로 바꿨어요.`)}});
 let finArm=false;
 $('finishBtn').addEventListener('click',e=>{
   if(!finArm){finArm=true;e.target.textContent='한 번 더 누르면 출석·쿼터가 비워져요 (기록은 보관)';setTimeout(()=>{finArm=false;e.target.textContent='이번 경기 마치고 새 경기 준비'},4000);return}
   finArm=false;e.target.textContent='이번 경기 마치고 새 경기 준비';
   snap();const d=S.date;
   S.q.forEach(q=>{q.slots=emptyFor(q);q.b=emptyFor(q);q.started=null;q.ages=[...AGES];q.agesB=[...AGES];resetPos(q)});S.cur=0;sel=null;
-  S.players.forEach(p=>{p.here=false;p.arr=null;p.left=null});{const n=schedNext();S.date=n?n.date:today()}S.gid='g'+Date.now();S.nq=9;S.q.length=9;schedApply();
+  S.players.forEach(p=>{p.here=false;p.arr=null;p.left=null});S.gid='g'+Date.now();S.nq=9;S.q.length=9;
   render();setView('att');say(`${dLabel(d)} 경기는 기록 탭에 저장했어요. 다음 경기(${dLabel(S.date)}) 준비를 시작하세요.`);
 });
 $('hlist').addEventListener('click',e=>{
@@ -1162,7 +1190,7 @@ $('resetBtn').addEventListener('click',e=>{
   resetArm=false;e.target.textContent='쿼터 기록만 비우기 (출석 유지)';
   S.q.forEach(q=>{q.slots=emptyFor(q);q.b=emptyFor(q);q.started=null});S.cur=0;sel=null;render();say('새 경기를 시작했어요. 나이대 제한 쿼터가 있으면 먼저 설정하고, 1쿼터 자동 편성을 눌러 주세요.');
 });
-norm();if(S.date<today()&&!S.q.some((q,i)=>counted(i)))S.date=today();
+norm();if(S.date<today()&&!S.q.some((q,i)=>counted(i)))S.date=today();try{evEnsure()}catch(e){}
 /* ---- 서버 저장 (Firebase Firestore, 무료 요금제) ---- */
 const FBV='13.4.0';
 const DEF_CFG={"apiKey":"AIzaSyDvJZfjmVWOMXzNAgYciQC80qDx8n3iP6E","authDomain":"benchzero-50f14.firebaseapp.com","projectId":"benchzero-50f14","storageBucket":"benchzero-50f14.firebasestorage.app","messagingSenderId":"279178405228","appId":"1:279178405228:web:11cefb680a5a1c85837f49"};
@@ -1236,16 +1264,17 @@ function ciTick(){
   if(!SY.ref||!db||!c.code){ciUnsub();renderCi();return}
   if(CI.code!==c.code||CI.day!==today()){
     ciUnsub();CI.code=c.code;CI.day=today();
-    CI.unIn=F.onSnapshot(F.query(F.collection(db,'pub',c.code,'in'),F.where('date','==',CI.day)),qs=>ciApply(qs.docs.map(d=>Object.assign({id:d.id},d.data()))),()=>{});
+    CI.unIn=F.onSnapshot(F.query(F.collection(db,'pub',c.code,'in'),F.where('date','==',CI.day)),qs=>{CI.docs=qs.docs.map(d=>Object.assign({id:d.id},d.data()));ciApply(CI.docs)},()=>{});
     CI.unBind=F.onSnapshot(F.collection(db,'pub',c.code,'bind'),qs=>{CI.binds=qs.docs.map(d=>Object.assign({id:d.id},d.data()));renderCi();renderRoster()},()=>{});
   }
-  if(S.ciDone.date===today()){const gone=S.ciDone.ids.filter(id=>{const p=S.players.find(x=>x.id===id.slice(11));return p&&!p.here&&!p.left});if(gone.length){S.ciDone.ids=S.ciDone.ids.filter(id=>!gone.includes(id));S.ciDone.del=[...(S.ciDone.del||[]).filter(x=>x&&x.id),...gone.map(id=>({id,t:Date.now()}))];gone.forEach(id=>F.deleteDoc(F.doc(db,'pub',c.code,'in',id)).catch(()=>{}));save()}}
-  const pub={title:'벤치제로',on:!!c.on,radius:+c.radius||300,sched:{home:S.sched.home,weekly:S.sched.weekly,games:S.sched.games.filter(g=>g.date>=today())},names:S.players.map(p=>({id:p.id,name:p.name,age:p.age||null}))};
+  if(S.ciDone.date===today()){const gone=S.ciDone.ids.filter(id=>{const p=S.players.find(x=>x.id===id.slice(id.lastIndexOf('_')+1));return p&&!p.here&&!p.left});if(gone.length){S.ciDone.ids=S.ciDone.ids.filter(id=>!gone.includes(id));S.ciDone.del=[...(S.ciDone.del||[]).filter(x=>x&&x.id),...gone.map(id=>({id,t:Date.now()}))];gone.forEach(id=>F.deleteDoc(F.doc(db,'pub',c.code,'in',id)).catch(()=>{}));save()}}
+  const pub={title:'벤치제로',on:!!c.on,radius:+c.radius||300,sched:{home:S.sched.home,weekly:S.sched.weekly,games:S.sched.games.filter(g=>g.date>=today())},events:evList().map(e=>({id:e.id,date:e.date,from:e.from,to:e.to,loc:e.place,opp:e.opp,mode:e.mode})),names:S.players.map(p=>({id:p.id,name:p.name,age:p.age||null}))};
   const k=JSON.stringify(pub);
   if(k!==CI.lastPub){clearTimeout(CI.pubT);CI.pubT=setTimeout(()=>{F.setDoc(F.doc(db,'pub',c.code),Object.assign(pub,{upd:Date.now()})).then(()=>{CI.lastPub=k}).catch(()=>{})},800)}
   renderCi();
 }
 function ciApply(docs){
+  docs=docs.filter(d=>!d.ev||d.ev===S.evId);
   if(S.date!==today())return;
   if(S.ciDone.date!==today())S.ciDone={date:today(),ids:[]};
   const present=new Set(docs.map(d=>d.id));S.ciDone.del=(S.ciDone.del||[]).filter(x=>x&&x.id&&present.has(x.id));
@@ -1276,7 +1305,7 @@ function renderCi(){
   const bound=CI.binds.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'ko'));
   const url=ciLink();
   const ae=document.activeElement;if(!CI.force&&ae&&box.contains(ae)&&ae.tagName==='INPUT'&&ae.type==='text')return;CI.force=false;
-  const sc=S.sched,DN=['일','월','화','수','목','금','토'],gs=sc.games.filter(g=>g.date>=today()).sort((x,y)=>x.date.localeCompare(y.date));
+  const sc=S.sched,DN=['일','월','화','수','목','금','토'],gs=sc.games.filter(g=>g.date>=today()).sort((x,y)=>x.date.localeCompare(y.date)||x.from.localeCompare(y.from));
   if(!CI.dr)CI.dr={date:'',from:'05:00',to:'11:00',mode:'match',opp:'',place:null};const dr=CI.dr;
   box.innerHTML=`<div class="cibox">
   <p class="cist on">● 켜짐 · 오늘 체크인 ${CI.count||0}명 · 등록된 휴대폰 ${bound.length}대</p>
@@ -1291,9 +1320,9 @@ function renderCi(){
   <p class="cist">정기 경기 요일 (누르면 켜고 꺼요)</p>
   <div class="dows">${DN.map((d,i)=>`<button class="${sc.weekly[i]?'on':''}" data-dow="${i}">${d}</button>`).join('')}</div>
   ${Object.keys(sc.weekly).sort().map(i=>`<div class="row2"><label>${DN[i]}요일 출석 열림<select data-wk="${i}:from">${opt(sc.weekly[i].from)}</select></label><label>닫힘<select data-wk="${i}:to">${opt(sc.weekly[i].to)}</select></label></div>`).join('')}
-  <p class="hint">정기 요일에는 홈 구장에서 위 시간에 출석이 열려요. 원정·시간 변경·상대팀은 아래에 그 날짜 경기를 추가하면 그날만 바뀌어요.</p>
+  <p class="hint">정기 요일에는 홈 구장에서 위 시간에 출석이 열려요. 원정·상대팀 경기는 아래에 추가해요. 같은 날 여러 경기도 넣을 수 있고, 경기를 추가한 날은 정기 경기 대신 추가한 경기만 열려요.</p>
   <p class="cist">예정 경기 ${gs.length}개</p>
-  <div class="gms">${gs.length?gs.map(g=>`<div class="gm"><b>${g.date.slice(5).replace('-','/')}(${DN[new Date(g.date+'T00:00').getDay()]}) ${g.from}~${g.to}</b><span>${esc(g.place?g.place.name:sc.home.name)}${g.opp?' · vs '+esc(g.opp):''}${g.mode==='scrim'?' · 자체전':''}</span><button data-gdel="${g.date}">삭제</button></div>`).join(''):'<p class="hint">따로 추가한 경기가 없어요.</p>'}</div>
+  <div class="gms">${gs.length?gs.map(g=>`<div class="gm"><b>${g.date.slice(5).replace('-','/')}(${DN[new Date(g.date+'T00:00').getDay()]}) ${g.from}~${g.to}</b><span>${esc(g.place?g.place.name:sc.home.name)}${g.opp?' · vs '+esc(g.opp):''}${g.mode==='scrim'?' · 자체전':''}</span><button data-gdel="${esc(g.id||g.date)}">삭제</button></div>`).join(''):'<p class="hint">따로 추가한 경기가 없어요.</p>'}</div>
   <div class="gadd"><label>날짜<input type="date" data-gd="date" value="${esc(dr.date)}" min="${today()}"></label>
   <div class="row2"><label>열림<select data-gd="from">${opt(dr.from)}</select></label><label>닫힘<select data-gd="to">${opt(dr.to)}</select></label><label>방식<select data-gd="mode"><option value="match" ${dr.mode==='match'?'selected':''}>상대팀</option><option value="scrim" ${dr.mode==='scrim'?'selected':''}>자체전</option></select></label></div>
   <label>상대팀<input type="text" data-gd="opp" value="${esc(dr.opp)}" placeholder="없으면 비워 두기" autocomplete="off"></label>
@@ -1350,10 +1379,10 @@ document.addEventListener('click',e=>{
   if(a==='gplace'){ciNorm();openMap(CI.dr.place||S.sched.home,v=>{CI.dr.place=v;CI.force=true;renderCi()});return}
   if(a==='gphome'){CI.dr.place=null;CI.force=true;renderCi();return}
   if(a==='gadd'){ciNorm();const d=CI.dr;if(!d.date){say('경기 날짜를 골라 주세요.');return}
-    S.sched.games=S.sched.games.filter(g=>g.date!==d.date&&g.date>=today());S.sched.games.push({date:d.date,from:d.from,to:d.to,mode:d.mode,opp:d.opp.trim(),place:d.place});
-    CI.dr=null;ciRe();say(`${d.date} 경기를 추가했어요. 그날은 이 설정으로 출석이 열려요.`);return}
+    S.sched.games=S.sched.games.filter(g=>g.date>=today());const nid='e'+d.date.replace(/-/g,'')+Math.random().toString(36).slice(2,6);if(S.evId==='w'+d.date)S.evId=nid;S.sched.games.push({id:nid,date:d.date,from:d.from,to:d.to,mode:d.mode,opp:d.opp.trim(),place:d.place});
+    CI.dr=null;ciRe();say(`${d.date} ${d.from} 경기를 추가했어요. 화면 위 경기 선택에서 고를 수 있어요.`);return}
   const w=e.target.closest('[data-dow]');if(w){ciNorm();const i=w.dataset.dow;if(S.sched.weekly[i])delete S.sched.weekly[i];else S.sched.weekly[i]={from:'05:00',to:'11:00'};ciRe();return}
-  const g=e.target.closest('[data-gdel]');if(g){ciNorm();S.sched.games=S.sched.games.filter(x=>x.date!==g.dataset.gdel);ciRe();say('경기를 지웠어요.')}
+  const g=e.target.closest('[data-gdel]');if(g){ciNorm();S.sched.games=S.sched.games.filter(x=>(x.id||x.date)!==g.dataset.gdel);ciRe();say('경기를 지웠어요.')}
 });
 document.addEventListener('change',e=>{
   const w=e.target.closest('[data-wk]');if(w){ciNorm();const [i,k]=w.dataset.wk.split(':');if(S.sched.weekly[i]){S.sched.weekly[i][k]=w.value;ciRe()}return}
