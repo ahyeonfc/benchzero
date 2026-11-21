@@ -71,7 +71,8 @@ function readConf(){
 }
 const D=(a,b)=>{const R=6371000,r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dn=r(b.lng-a.lng);const h=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
 const nowHM=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())};
-const inWin=P=>{const n=nowHM(),f=P.from||'00:00',t=P.to||'23:59';return f<=t?n>=f&&n<=t:(n>=f||n<=t)};
+const early=f=>{const [h,m]=String(f||'00:00').split(':').map(Number),x=Math.max(0,h*60+m-60);return pad(Math.floor(x/60))+':'+pad(x%60)};
+const inWin=P=>{const n=nowHM(),f=early(P.from),t=P.to||'23:59';return f<=t?n>=f&&n<=t:(n>=f||n<=t)};
 const DN=['일','월','화','수','목','금','토'];const fmtD=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 function evtOn(P,d){const sc=P.sched;if(!sc)return{from:P.from,to:P.to,loc:P.loc||null};const ds=fmtD(d),g=(sc.games||[]).find(x=>x.date===ds);if(g)return{from:g.from,to:g.to,loc:g.place||sc.home,opp:g.opp,mode:g.mode,d};const w=sc.weekly&&sc.weekly[d.getDay()];return w?{from:w.from,to:w.to,loc:sc.home,d}:null}
 function nextEvt(P){for(let i=1;i<=60;i++){const d=new Date();d.setDate(d.getDate()+i);const e=evtOn(P,d);if(e)return e}return null}
@@ -110,7 +111,7 @@ function render(){
   const card=E=>{const me=mineOf(E.id),open=P.on!==false&&inWin(E),L=ST.list.filter(x=>(x.ev||'')===E.id);let btn;
     if(me)btn=`<button class="big done" disabled>✓ 도착<small>${hm(me.t)} · ${L.indexOf(me)+1}번째</small></button>`;
     else if(P.on===false)btn=`<button class="big" disabled>출석 닫힘<small>운영자가 아직 안 열었어요</small></button>`;
-    else if(!open)btn=`<button class="big" disabled>출석 시간 아님<small>${esc(E.from||'')}~${esc(E.to||'')}에 열려요</small></button>`;
+    else if(!open)btn=`<button class="big" disabled>출석 시간 아님<small>${esc(early(E.from))}부터 열려요</small></button>`;
     else btn=`<button class="big" data-go="${esc(E.id)}" ${ST.busy?'disabled':''}>${ST.busy===E.id||ST.busy===true?'확인 중…':'도착했어요'}<small>${E.loc&&E.loc.lat?'운동장에서 눌러 주세요':'누르면 출석돼요'}</small></button>`;
     return `<p class="hint evh" style="text-align:center;margin:.6rem 0 0;font-weight:700">${multi?'경기 · ':'오늘 경기 · '}${esc(evtTxt(E))}</p><div class="${multi?'sm':''}">${btn}</div>`};
   app.innerHTML=`<div class="card"><p class="who">${esc(ST.me.name)} 님</p>${EV.length?EV.map(card).join(''):`<button class="big" disabled>오늘은 경기 없는 날<small>${N?`다음 ${N.d.getMonth()+1}/${N.d.getDate()}(${DN[N.d.getDay()]})`:'일정이 없어요'}</small></button>${N?`<p class="hint" style="text-align:center">다음 경기 · ${esc(evtTxt(N))}</p>`:''}`}${m}<p class="hint" style="text-align:center">이 휴대폰은 ${esc(ST.me.name)} 님 전용이에요. 바꾸려면 운영자에게 말해 주세요.</p></div>`;
