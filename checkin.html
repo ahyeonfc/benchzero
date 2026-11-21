@@ -23,6 +23,7 @@ input{font:inherit;width:100%;min-height:3rem;border-radius:.75rem;border:1px so
 .big small{display:block;font-size:.85rem;font-weight:500;opacity:.9}
 .big:disabled{background:light-dark(#cfd8d3,#2a3a32);color:var(--mute);box-shadow:none}
 .big.done{background:var(--deep)}
+.sm .big{width:min(52vw,11rem);font-size:1.25rem;margin:.4rem auto .6rem}
 .msg{text-align:center;font-weight:700;min-height:1.5rem;margin:0 0 .5rem}.msg.bad{color:var(--bad)}.msg.ok{color:var(--go)}
 .names{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.4rem;margin-top:.6rem}
 .names button{min-height:2.8rem;padding:0 .3rem;font-size:.95rem}
@@ -78,7 +79,10 @@ const evtTxt=e=>`${e.from}~${e.to}${e.loc&&e.loc.name?' · '+e.loc.name:''}${e.o
 const agL=a=>a?(a>=70?'70대':a+'대'):'기타';
 
 function say(t,c){ST.msg=t||'';ST.mcls=c||'';render()}
-function mine(){return ST.me&&ST.list.find(x=>x.pid===ST.me.pid)}
+function evsToday(P){const ds=today();if(Array.isArray(P.events)){const L=P.events.filter(e=>e.date===ds);if(L.length)return L;const sc=P.sched,w=sc&&sc.weekly&&sc.weekly[new Date().getDay()];if(w&&!(sc.games||[]).some(g=>g.date===ds))return[{id:'w'+ds,date:ds,from:w.from,to:w.to,loc:sc.home,opp:'',mode:null}];return[]}
+  const e=evtOn(P,new Date());return e?[{id:'',date:ds,from:e.from,to:e.to,loc:e.loc,opp:e.opp||'',mode:e.mode||null}]:[]}
+function evNext(P){const ds=today();if(Array.isArray(P.events)){const n=P.events.filter(e=>e.date>ds).sort((a,b)=>a.date.localeCompare(b.date)||a.from.localeCompare(b.from))[0];if(n)return Object.assign({d:new Date(n.date+'T00:00')},n)}return nextEvt(P)}
+const mineOf=id=>ST.me&&ST.list.find(x=>x.pid===ST.me.pid&&(x.ev||'')===id);
 function render(){
   const P=ST.P,app=$('app');
   $('today').textContent=new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'});
@@ -102,25 +106,25 @@ function render(){
     app.innerHTML=`<div class="card"><p class="who">${esc(ST.confirm.name)} 님이 맞나요?</p><p class="hint" style="text-align:center">이 휴대폰은 ${esc(ST.confirm.name)} 님 전용이 돼요.<br>다른 사람 이름으로는 출석할 수 없어요.</p>${m}<div class="row" style="margin-top:.8rem"><button id="no">아니에요</button><button class="pri" id="yes">네, 맞아요</button></div></div>`;
     return;
   }
-  const E=evtOn(P,new Date()),N=E?null:nextEvt(P);
-  const me=mine(),open=P.on!==false&&E&&inWin(E);
-  let btn;
-  if(me)btn=`<button class="big done" disabled>✓ 도착<small>${hm(me.t)} · ${ST.list.indexOf(me)+1}번째</small></button>`;
-  else if(P.on===false)btn=`<button class="big" disabled>출석 닫힘<small>운영자가 아직 안 열었어요</small></button>`;
-  else if(!E)btn=`<button class="big" disabled>오늘은 경기 없는 날<small>${N?`다음 ${N.d.getMonth()+1}/${N.d.getDate()}(${DN[N.d.getDay()]})`:'일정이 없어요'}</small></button>`;
-  else if(!open)btn=`<button class="big" disabled>출석 시간 아님<small>${esc(E.from||'')}~${esc(E.to||'')}에 열려요</small></button>`;
-  else btn=`<button class="big" id="go" ${ST.busy?'disabled':''}>${ST.busy?'확인 중…':'도착했어요'}<small>${E.loc&&E.loc.lat?'운동장에서 눌러 주세요':'누르면 출석돼요'}</small></button>`;
-  app.innerHTML=`<div class="card"><p class="who">${esc(ST.me.name)} 님</p><p class="hint" style="text-align:center;margin:.2rem 0 0">${E?'오늘 경기 · '+esc(evtTxt(E)):N?`다음 경기 · ${N.d.getMonth()+1}/${N.d.getDate()}(${DN[N.d.getDay()]}) ${esc(evtTxt(N))}`:''}</p>${btn}${m}<p class="hint" style="text-align:center">이 휴대폰은 ${esc(ST.me.name)} 님 전용이에요. 바꾸려면 운영자에게 말해 주세요.</p></div>`;
+  const EV=evsToday(P),N=EV.length?null:evNext(P),multi=EV.length>1;
+  const card=E=>{const me=mineOf(E.id),open=P.on!==false&&inWin(E),L=ST.list.filter(x=>(x.ev||'')===E.id);let btn;
+    if(me)btn=`<button class="big done" disabled>✓ 도착<small>${hm(me.t)} · ${L.indexOf(me)+1}번째</small></button>`;
+    else if(P.on===false)btn=`<button class="big" disabled>출석 닫힘<small>운영자가 아직 안 열었어요</small></button>`;
+    else if(!open)btn=`<button class="big" disabled>출석 시간 아님<small>${esc(E.from||'')}~${esc(E.to||'')}에 열려요</small></button>`;
+    else btn=`<button class="big" data-go="${esc(E.id)}" ${ST.busy?'disabled':''}>${ST.busy===E.id||ST.busy===true?'확인 중…':'도착했어요'}<small>${E.loc&&E.loc.lat?'운동장에서 눌러 주세요':'누르면 출석돼요'}</small></button>`;
+    return `<p class="hint evh" style="text-align:center;margin:.6rem 0 0;font-weight:700">${multi?'경기 · ':'오늘 경기 · '}${esc(evtTxt(E))}</p><div class="${multi?'sm':''}">${btn}</div>`};
+  app.innerHTML=`<div class="card"><p class="who">${esc(ST.me.name)} 님</p>${EV.length?EV.map(card).join(''):`<button class="big" disabled>오늘은 경기 없는 날<small>${N?`다음 ${N.d.getMonth()+1}/${N.d.getDate()}(${DN[N.d.getDay()]})`:'일정이 없어요'}</small></button>${N?`<p class="hint" style="text-align:center">다음 경기 · ${esc(evtTxt(N))}</p>`:''}`}${m}<p class="hint" style="text-align:center">이 휴대폰은 ${esc(ST.me.name)} 님 전용이에요. 바꾸려면 운영자에게 말해 주세요.</p></div>`;
 }
 function renderList(){
-  const L=ST.list;$('listH').textContent=`오늘 도착 순서 · ${L.length}명`;
-  $('list').innerHTML=L.length?L.map((x,i)=>`<li class="${ST.me&&x.pid===ST.me.pid?'me':''}"><b>${i+1}</b>${esc(x.name)}<span class="t">${hm(x.t)}</span></li>`).join(''):'<li style="border:0;color:var(--mute)">아직 아무도 안 왔어요. 첫 번째가 되어 보세요!</li>';
+  const P=ST.P,EV=P?evsToday(P):[];const one=L=>L.length?L.map((x,i)=>`<li class="${ST.me&&x.pid===ST.me.pid?'me':''}"><b>${i+1}</b>${esc(x.name)}<span class="t">${hm(x.t)}</span></li>`).join(''):'<li style="border:0;color:var(--mute)">아직 아무도 안 왔어요. 첫 번째가 되어 보세요!</li>';
+  if(EV.length>1){$('listH').textContent='오늘 도착 순서';$('list').innerHTML=EV.map(E=>{const L=ST.list.filter(x=>(x.ev||'')===E.id);return `<li style="border:0;font-weight:800;padding-bottom:0">${esc(E.from)}${E.opp?' vs '+esc(E.opp):''} · ${L.length}명</li>${one(L)}`}).join('')}
+  else{const id=EV[0]?EV[0].id:'',L=ST.list.filter(x=>(x.ev||'')===id||!EV.length);$('listH').textContent=`오늘 도착 순서 · ${L.length}명`;$('list').innerHTML=one(L)}
 }
 function locate(){return new Promise((res,rej)=>{if(!navigator.geolocation)return rej({code:9});navigator.geolocation.getCurrentPosition(p=>res(p.coords),rej,{enableHighAccuracy:true,timeout:15000,maximumAge:20000})})}
 
-async function checkIn(){
+async function checkIn(evId){
   const P=ST.P,F=ST.F;if(ST.busy||!ST.me)return;
-  const E=evtOn(P,new Date());if(!E||!inWin(E)||P.on===false){render();return}
+  const E=evsToday(P).find(e=>e.id===evId);if(!E||!inWin(E)||P.on===false){render();return}
   ST.busy=true;say('');
   let dist=null,acc=null;
   try{
@@ -130,9 +134,9 @@ async function checkIn(){
       const lim=(P.radius||300)+Math.min(acc,150);
       if(dist>lim){ST.busy=false;say(`${E.loc.name||'운동장'}에서 약 ${dist>=1000?(dist/1000).toFixed(1)+'km':dist+'m'} 떨어져 있어요. 도착하면 눌러 주세요.`,'bad');return}
     }
-    const id=today()+'_'+ST.me.pid,ref=F.doc(ST.db,'pub',ST.conf.code,'in',id);
+    const id=(E.id||today())+'_'+ST.me.pid,ref=F.doc(ST.db,'pub',ST.conf.code,'in',id);
     const ex=await F.getDoc(ref);
-    if(!ex.exists())await F.setDoc(ref,{pid:ST.me.pid,name:ST.me.name,dev:DEV,date:today(),ts:F.serverTimestamp(),dist,acc});
+    if(!ex.exists())await F.setDoc(ref,{pid:ST.me.pid,name:ST.me.name,dev:DEV,date:today(),ev:E.id||'',ts:F.serverTimestamp(),dist,acc});
     ST.busy=false;say('출석했어요. 오늘도 즐겁게 차세요! ⚽','ok');
   }catch(e){ST.busy=false;say('출석이 저장되지 않았어요. 인터넷 연결을 확인하고 다시 눌러 주세요.','bad')}
 }
@@ -150,7 +154,7 @@ async function bind(){
 }
 document.addEventListener('click',e=>{
   const p=e.target.closest('[data-pick]');if(p){pick(p.dataset.pick);return}
-  if(e.target.closest('#go'))checkIn();
+  const g=e.target.closest('[data-go]');if(g)checkIn(g.dataset.go);
   if(e.target.closest('#yes'))bind();
   if(e.target.closest('#no')){ST.confirm=null;ST.me=null;ST.msg='';render()}
 });
@@ -164,11 +168,11 @@ async function start(){
     const app=A.getApps().find(a=>a.name==='bz-ci')||A.initializeApp(ST.conf.cfg,'bz-ci');
     ST.F=F;ST.db=F.getFirestore(app);
     const code=ST.conf.code;
-    F.onSnapshot(F.doc(ST.db,'pub',code),s=>{ST.P=s.exists()?s.data():null;if(!ST.P)ST.err='출석이 아직 준비되지 않았어요. 운영자에게 알려 주세요.';render()},()=>{ST.err='연결하지 못했어요. 인터넷 연결을 확인해 주세요.';render()});
+    F.onSnapshot(F.doc(ST.db,'pub',code),s=>{ST.P=s.exists()?s.data():null;if(!ST.P)ST.err='출석이 아직 준비되지 않았어요. 운영자에게 알려 주세요.';render();renderList()},()=>{ST.err='연결하지 못했어요. 인터넷 연결을 확인해 주세요.';render()});
     if(ST.me){F.getDoc(F.doc(ST.db,'pub',code,'bind',ST.me.pid)).then(s=>{if(!s.exists()||s.data().dev!==DEV){const nm=ST.me.name;ST.me=null;store('bz-me',null);say(`${nm} 님 등록이 해제됐어요. 이름을 다시 골라 주세요.`,'bad')}}).catch(()=>{})}
     let day=today(),unsub=null;
     const sub=()=>{if(unsub)unsub();unsub=F.onSnapshot(F.query(F.collection(ST.db,'pub',code,'in'),F.where('date','==',day)),qs=>{
-      ST.list=qs.docs.map(d=>{const x=d.data();return{pid:x.pid,name:x.name,t:x.ts&&x.ts.toMillis?x.ts.toMillis():Date.now()}}).sort((a,b)=>a.t-b.t);renderList();render()})};
+      ST.list=qs.docs.map(d=>{const x=d.data();return{pid:x.pid,name:x.name,ev:x.ev||'',t:x.ts&&x.ts.toMillis?x.ts.toMillis():Date.now()}}).sort((a,b)=>a.t-b.t);renderList();render()})};
     sub();setInterval(()=>{if(today()!==day){day=today();sub()}if(ST.me&&!ST.confirm)render()},30000);
   }catch(e){ST.err='연결하지 못했어요. 인터넷 연결을 확인해 주세요.';render()}
 }
