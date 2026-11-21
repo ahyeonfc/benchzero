@@ -1290,11 +1290,12 @@ async function geminiSample(prompt,opts){
   const A=await import(`https://www.gstatic.com/firebasejs/${FBV}/firebase-app.js`);
   const AI=await import(`https://www.gstatic.com/firebasejs/${FBV}/firebase-ai.js`);
   const app=A.getApps().find(a=>a.name==='jogi-'+SY.cfg.projectId);if(!app)throw new Error('noapp');
+  if(!window.__bzAC){try{const AC=await import(`https://www.gstatic.com/firebasejs/${FBV}/firebase-app-check.js`);AC.initializeAppCheck(app,{provider:new AC.ReCaptchaEnterpriseProvider('6LdTpysuAAAAAHS6LrKtkAOb-aX703On-0BzGHsH'),isTokenAutoRefreshEnabled:true});window.__bzAC=1}catch(e){}}
   const ai=AI.getAI(app,{backend:new AI.GoogleAIBackend()});
   const data=await blobB64(opts.images[0]);
-  const models=[...new Set([S.ai.model||'gemini-3.5-flash','gemini-3.5-flash','gemini-2.5-flash'])];
+  const models=[...new Set([S.ai.model||'gemini-3.5-flash','gemini-3.5-flash','gemini-3.5-flash-lite'])];
   let last;
-  for(const m of models){try{const r=await AI.getGenerativeModel(ai,{model:m}).generateContent([prompt,{inlineData:{data,mimeType:'image/jpeg'}}]);return{text:r.response.text()}}catch(e){last=e;if(!/not.?found|404|unsupported/i.test(String(e&&e.message)))break}}
+  for(const m of models){try{const r=await AI.getGenerativeModel(ai,{model:m}).generateContent([prompt,{inlineData:{data,mimeType:'image/jpeg'}}]);return{text:r.response.text()}}catch(e){last=e;if(!/not.?found|404|unsupported|no longer|not available/i.test(String(e&&e.message)))break}}
   throw last;
 }
 function photoOK(){try{ciNorm();return !!(SMP||(SY.ref&&S.ai.on))}catch(e){return !!SMP}}
@@ -1399,7 +1400,7 @@ function matchName(n){n=String(n||'').replace(/\s/g,'');if(!n)return null;let p=
   const sim=n.length>=3?S.players.filter(x=>x.name.length===n.length&&[...x.name].filter((ch,i)=>n[i]===ch).length>=n.length-1):[];return sim.length===1?sim[0]:null}
 async function photoToBoard(file){
   const q=S.q[S.cur];if(!photoOK())return;if(q.started){say('이미 시작한 쿼터예요. 다음 쿼터로 넘어간 뒤 찍어 주세요.');return}
-  PH.busy=true;renderSimple();say('말판 사진에서 이름을 읽고 있어요. 10~30초쯤 걸려요.');
+  PH.busy=true;renderSimple();say('말판 사진에서 이름을 읽고 있어요. 30초쯤 걸려요.');
   const two=qm(q);
   try{
     const blob=await shrink(file);
@@ -1412,7 +1413,7 @@ JSON만 답해 주세요. 다른 말은 쓰지 마세요.
 {"players":[{"name":"홍길동","x":50,"y":92,"team":"A","known":true}]}`;
     const r=await runPhoto(prompt,{images:[blob],modelTier:'complex'});
     const m=String(r&&r.text||'').match(/\{[\s\S]*\}/);if(!m)throw new Error('parse');
-    const arr=(JSON.parse(m[0]).players||[]).filter(o=>o&&o.name);
+    const arr=(JSON.parse(m[0]).players||[]).filter(o=>o&&o.name);if(arr.some(o=>+o.x>100||+o.y>100))arr.forEach(o=>{o.x=+o.x/10;o.y=+o.y/10});
     const prev=JSON.stringify({slots:q.slots,b:q.b,pos:q.pos,pm:q.pm}),hereBefore=S.players.filter(p=>p.here).map(p=>p.id);
     const T={A:[],B:[]},seen=new Set(),miss=[];
     arr.forEach(o=>{const p=o.known===false?S.players.find(x=>x.name===String(o.name).replace(/\s/g,''))||null:matchName(o.name);if(!p){miss.push(o.name);return}if(seen.has(p.id))return;seen.add(p.id);
