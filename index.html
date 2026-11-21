@@ -405,6 +405,7 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 <h2>설정</h2>
 <div class="btns" style="margin:0 0 .5rem"><button class="pri" id="toSimple2">간편 모드로 보기</button></div>
 <details class="sec" open><summary>경기</summary><div>
+<p class="cist" id="gInfo" style="margin:0 0 .5rem"></p>
 <div class="ctrl">
 <label><span class="fl">기본 경기 방식</span><select id="mode"><option value="match">상대팀 경기</option><option value="scrim">자체전 (A팀 vs B팀)</option></select></label>
 <label><span class="fl">쿼터 수</span><select id="nq"></select></label>
@@ -830,7 +831,12 @@ function renderAtt(){
   }else html=list.map(btn).join('');
   $('att').innerHTML=html||(S.players.length?'<p class="empty-note">조건에 맞는 회원이 없어요.</p>':'<p class="empty-note">명단이 비어 있어요. <b>설정</b> 탭에서 서버에 연결하거나, 백업 글을 붙여 넣어 복원하거나, 명단 편집에서 회원을 추가해 주세요.</p>');
 }
+function schedOn(ds){try{ciNorm()}catch(e){return null}const sc=S.sched,g=sc.games.find(x=>x.date===ds);if(g)return{date:ds,from:g.from,to:g.to,place:g.place||sc.home,opp:g.opp||'',mode:g.mode||'match',reg:true};const w=sc.weekly[new Date(ds+'T00:00').getDay()];return w?{date:ds,from:w.from,to:w.to,place:sc.home,opp:'',mode:null,reg:false}:null}
+function schedNext(){for(let i=0;i<=60;i++){const d=new Date();d.setDate(d.getDate()+i);const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),e=schedOn(ds);if(e)return e}return null}
+function schedTxt(e){const d=new Date(e.date+'T00:00');return `${d.getMonth()+1}/${d.getDate()}(${'일월화수목금토'[d.getDay()]}) ${e.from}~${e.to} · ${e.place.name}${e.opp?' · vs '+e.opp:''}${e.mode==='scrim'?' · 자체전':''}`}
+function schedApply(){const e=schedOn(S.date);S.opp=e?e.opp:'';if(e&&e.reg&&e.mode!==S.mode&&!S.q.some((q,i)=>counted(i))){S.mode=e.mode;S.q.forEach(q=>{if(!q.started&&!filled(q)&&q.mode!==S.mode){q.mode=S.mode;resetPos(q);q.slots=emptyFor(q);q.b=emptyFor(q)}})}}
 function renderCtrl(){
+  {const e=schedOn(S.date),n=e?null:schedNext(),gi=$('gInfo');if(gi){gi.className='cist '+(e?'on':'off');gi.textContent=e?(e.reg?'등록된 경기 · ':'정기 경기 · ')+schedTxt(e):'이 날짜에는 경기 일정이 없어요'+(n?' · 다음 '+schedTxt(n):'')}}
   $('pdSel').value=S.pd==='detail'?'detail':'big';
   $('gdate').value=S.date;
   $('mode').value=S.mode;
@@ -852,7 +858,7 @@ function snap(){
   if(!qs.length){S.games=S.games.filter(g=>g.gid!==S.gid);return}
   const inQ=id=>qs.some(q=>q.slots.includes(id)||q.b.includes(id));
   const present=S.players.filter(p=>p.here||p.left||inQ(p.id)).map(p=>({id:p.id,name:p.name,age:p.age,role:p.role,pos:p.pos?[...p.pos]:[],arr:p.arr||null,left:p.left||null,here:!!p.here}));
-  const rec={gid:S.gid,date:S.date,mode:S.mode,form:S.form,size:S.size,formS:S.formS,sizeS:S.sizeS,q:qs,present,saved:Date.now()};
+  const rec={gid:S.gid,date:S.date,opp:S.opp||'',mode:S.mode,form:S.form,size:S.size,formS:S.formS,sizeS:S.sizeS,q:qs,present,saved:Date.now()};
   const i=S.games.findIndex(g=>g.gid===S.gid);
   if(i>=0)S.games[i]=rec;else S.games.push(rec);
   S.games.sort((a,b)=>b.date.localeCompare(a.date)||(b.saved||0)-(a.saved||0));
@@ -887,7 +893,7 @@ function renderHist(){
   $('hsum').textContent=games.length?`${games.length}경기 (${games[games.length-1].date} ~ ${games[0].date}) · ${list.length}명`:'아직 저장된 경기가 없어요. 작전판에서 경기 시작을 누르면 자동으로 저장돼요.';
   $('htbl').innerHTML=list.length?`<thead><tr><th>이름</th><th>출석</th><th>출전</th><th>대기</th><th>경기당<br>대기</th><th>최대<br>연속대기</th></tr></thead><tbody>${list.map(a=>`<tr><td><span class="dot2${AC(a.p)}"></span>${esc(a.p.name)} <small class="ag">${agL(a.p)}</small></td><td class="num">${a.att}</td><td class="num">${a.play}</td><td class="num">${a.rest}</td><td class="num">${rate(a).toFixed(1)}</td><td class="num ${a.mx>=3?'bad':a.mx>=2?'warn':''}">${a.mx}</td></tr>`).join('')}</tbody>`:'';
   $('hlist').innerHTML=S.games.map(g=>{const st=recStats(g),here=g.present.filter(p=>p.here||p.left).length,mx=Math.max(0,...Object.values(st).map(s=>s.mx)),open=hSel===g.gid;
-    return `<div class="hcard ${open?'open':''}"><button class="hhead" data-hd="${g.gid}"><b>${dLabel(g.date)}${g.gid===S.gid?' <span class="now">진행 중</span>':''}</b><small>${(n=>n===g.q.length?'자체전':n?`상대팀 경기 · 자체전 ${n}쿼터`:'상대팀 경기')(g.q.filter(q=>q.mode==='scrim'||(!q.mode&&g.mode==='scrim')).length)} · 출석 ${here}명 · ${g.q.length}쿼터 · 최대 연속 대기 ${mx}회</small></button>
+    return `<div class="hcard ${open?'open':''}"><button class="hhead" data-hd="${g.gid}"><b>${dLabel(g.date)}${g.opp?' · vs '+esc(g.opp):''}${g.gid===S.gid?' <span class="now">진행 중</span>':''}</b><small>${(n=>n===g.q.length?'자체전':n?`상대팀 경기 · 자체전 ${n}쿼터`:'상대팀 경기')(g.q.filter(q=>q.mode==='scrim'||(!q.mode&&g.mode==='scrim')).length)} · 출석 ${here}명 · ${g.q.length}쿼터 · 최대 연속 대기 ${mx}회</small></button>
     ${open?`${histTable(g)}<div class="btns" style="margin-top:10px"><button data-hcopy="${g.gid}">이 날 기록 글로 복사</button><button class="del" data-hdel="${g.gid}">이 날짜 기록 삭제</button></div>`:''}</div>`}).join('')||'<p class="empty-note">아직 저장된 경기가 없어요.</p>';
 }
 function render(){$('legA').innerHTML=$('legB').innerHTML=LEG;norm();snap();renderHist();renderNav();renderStart();renderTabs();renderAges();renderTeamSw();renderBoard();spread();renderBench();renderTable();renderRoster();renderAtt();renderCtrl();renderSimple();if($('photoMenu')){$('photoMenu').hidden=!photoOK();$('photoMenuCam').hidden=!photoOK()}save();try{if(SY.ref)ciTick()}catch(e){}}
@@ -1120,15 +1126,15 @@ $('attClear').addEventListener('click',e=>{
   if(!atArm){atArm=true;e.target.textContent='한 번 더 누르면 출석이 모두 해제돼요';setTimeout(()=>{atArm=false;e.target.textContent='모두 해제'},4000);return}
   atArm=false;e.target.textContent='모두 해제';S.players.forEach(p=>{p.here=false;p.arr=null;p.left=null});render();
 });
-$('gdate').addEventListener('change',e=>{if(/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)){S.date=e.target.value;render();say(`경기 날짜를 ${dLabel(S.date)}로 바꿨어요.`)}});
+$('gdate').addEventListener('change',e=>{if(/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)){S.date=e.target.value;schedApply();render();say(`경기 날짜를 ${dLabel(S.date)}로 바꿨어요.`)}});
 let finArm=false;
 $('finishBtn').addEventListener('click',e=>{
   if(!finArm){finArm=true;e.target.textContent='한 번 더 누르면 출석·쿼터가 비워져요 (기록은 보관)';setTimeout(()=>{finArm=false;e.target.textContent='이번 경기 마치고 새 경기 준비'},4000);return}
   finArm=false;e.target.textContent='이번 경기 마치고 새 경기 준비';
   snap();const d=S.date;
   S.q.forEach(q=>{q.slots=emptyFor(q);q.b=emptyFor(q);q.started=null;q.ages=[...AGES];q.agesB=[...AGES];resetPos(q)});S.cur=0;sel=null;
-  S.players.forEach(p=>{p.here=false;p.arr=null;p.left=null});S.date=today();S.gid='g'+Date.now();S.nq=9;S.q.length=9;
-  render();setView('att');say(`${dLabel(d)} 경기는 기록 탭에 저장했어요. 새 경기 출석 체크를 시작하세요.`);
+  S.players.forEach(p=>{p.here=false;p.arr=null;p.left=null});{const n=schedNext();S.date=n?n.date:today()}S.gid='g'+Date.now();S.nq=9;S.q.length=9;schedApply();
+  render();setView('att');say(`${dLabel(d)} 경기는 기록 탭에 저장했어요. 다음 경기(${dLabel(S.date)}) 준비를 시작하세요.`);
 });
 $('hlist').addEventListener('click',e=>{
   const hd=e.target.closest('[data-hd]');if(hd){hSel=hSel===hd.dataset.hd?null:hd.dataset.hd;renderHist();return}
@@ -1334,7 +1340,7 @@ function openMap(init,cb){
   loadLeaflet().then(()=>{if(!MP.map){MP.map=L.map('mapEl',{zoomControl:true}).setView(at,17);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(MP.map);MP.circle=L.circle(at,{radius:+S.ci.radius||300,color:'#16a34a',weight:1,fillOpacity:.12}).addTo(MP.map);MP.map.on('move',()=>MP.circle.setLatLng(MP.map.getCenter()))}
     else MP.map.setView(at,17);MP.circle.setRadius(+S.ci.radius||300);MP.circle.setLatLng(at);setTimeout(()=>MP.map.invalidateSize(),50)},()=>{$('mapRes').innerHTML='<p class="hint">지도를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.</p>'});
 }
-function ciRe(){CI.force=true;render();ciTick()}
+function ciRe(){CI.force=true;schedApply();render();ciTick()}
 document.addEventListener('click',e=>{
   const t=e.target.closest('[data-ci]');const a=t&&t.dataset.ci;
   if(a==='home'){ciNorm();openMap(S.sched.home,v=>{S.sched.home=v;ciRe();say(`홈 구장을 ${v.name}(으)로 저장했어요.`)});return}
