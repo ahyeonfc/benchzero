@@ -71,6 +71,10 @@ function readConf(){
 const D=(a,b)=>{const R=6371000,r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dn=r(b.lng-a.lng);const h=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
 const nowHM=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())};
 const inWin=P=>{const n=nowHM(),f=P.from||'00:00',t=P.to||'23:59';return f<=t?n>=f&&n<=t:(n>=f||n<=t)};
+const DN=['일','월','화','수','목','금','토'];const fmtD=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+function evtOn(P,d){const sc=P.sched;if(!sc)return{from:P.from,to:P.to,loc:P.loc||null};const ds=fmtD(d),g=(sc.games||[]).find(x=>x.date===ds);if(g)return{from:g.from,to:g.to,loc:g.place||sc.home,opp:g.opp,mode:g.mode,d};const w=sc.weekly&&sc.weekly[d.getDay()];return w?{from:w.from,to:w.to,loc:sc.home,d}:null}
+function nextEvt(P){for(let i=1;i<=60;i++){const d=new Date();d.setDate(d.getDate()+i);const e=evtOn(P,d);if(e)return e}return null}
+const evtTxt=e=>`${e.from}~${e.to}${e.loc&&e.loc.name?' · '+e.loc.name:''}${e.opp?' · vs '+e.opp:''}${e.mode==='scrim'?' · 자체전':''}`;
 const agL=a=>a?(a>=70?'70대':a+'대'):'기타';
 
 function say(t,c){ST.msg=t||'';ST.mcls=c||'';render()}
@@ -98,13 +102,15 @@ function render(){
     app.innerHTML=`<div class="card"><p class="who">${esc(ST.confirm.name)} 님이 맞나요?</p><p class="hint" style="text-align:center">이 휴대폰은 ${esc(ST.confirm.name)} 님 전용이 돼요.<br>다른 사람 이름으로는 출석할 수 없어요.</p>${m}<div class="row" style="margin-top:.8rem"><button id="no">아니에요</button><button class="pri" id="yes">네, 맞아요</button></div></div>`;
     return;
   }
-  const me=mine(),open=P.on!==false&&inWin(P);
+  const E=evtOn(P,new Date()),N=E?null:nextEvt(P);
+  const me=mine(),open=P.on!==false&&E&&inWin(E);
   let btn;
   if(me)btn=`<button class="big done" disabled>✓ 도착<small>${hm(me.t)} · ${ST.list.indexOf(me)+1}번째</small></button>`;
   else if(P.on===false)btn=`<button class="big" disabled>출석 닫힘<small>운영자가 아직 안 열었어요</small></button>`;
-  else if(!open)btn=`<button class="big" disabled>출석 시간 아님<small>${esc(P.from||'')}~${esc(P.to||'')}에 열려요</small></button>`;
-  else btn=`<button class="big" id="go" ${ST.busy?'disabled':''}>${ST.busy?'확인 중…':'도착했어요'}<small>${P.loc?'운동장에서 눌러 주세요':'누르면 출석돼요'}</small></button>`;
-  app.innerHTML=`<div class="card"><p class="who">${esc(ST.me.name)} 님</p>${btn}${m}<p class="hint" style="text-align:center">이 휴대폰은 ${esc(ST.me.name)} 님 전용이에요. 바꾸려면 운영자에게 말해 주세요.</p></div>`;
+  else if(!E)btn=`<button class="big" disabled>오늘은 경기 없는 날<small>${N?`다음 ${N.d.getMonth()+1}/${N.d.getDate()}(${DN[N.d.getDay()]})`:'일정이 없어요'}</small></button>`;
+  else if(!open)btn=`<button class="big" disabled>출석 시간 아님<small>${esc(E.from||'')}~${esc(E.to||'')}에 열려요</small></button>`;
+  else btn=`<button class="big" id="go" ${ST.busy?'disabled':''}>${ST.busy?'확인 중…':'도착했어요'}<small>${E.loc&&E.loc.lat?'운동장에서 눌러 주세요':'누르면 출석돼요'}</small></button>`;
+  app.innerHTML=`<div class="card"><p class="who">${esc(ST.me.name)} 님</p><p class="hint" style="text-align:center;margin:.2rem 0 0">${E?'오늘 경기 · '+esc(evtTxt(E)):N?`다음 경기 · ${N.d.getMonth()+1}/${N.d.getDate()}(${DN[N.d.getDay()]}) ${esc(evtTxt(N))}`:''}</p>${btn}${m}<p class="hint" style="text-align:center">이 휴대폰은 ${esc(ST.me.name)} 님 전용이에요. 바꾸려면 운영자에게 말해 주세요.</p></div>`;
 }
 function renderList(){
   const L=ST.list;$('listH').textContent=`오늘 도착 순서 · ${L.length}명`;
@@ -114,15 +120,15 @@ function locate(){return new Promise((res,rej)=>{if(!navigator.geolocation)retur
 
 async function checkIn(){
   const P=ST.P,F=ST.F;if(ST.busy||!ST.me)return;
-  if(!inWin(P)||P.on===false){render();return}
+  const E=evtOn(P,new Date());if(!E||!inWin(E)||P.on===false){render();return}
   ST.busy=true;say('');
   let dist=null,acc=null;
   try{
-    if(P.loc&&P.loc.lat){
+    if(E.loc&&E.loc.lat){
       let c;try{c=await locate()}catch(e){ST.busy=false;say(e&&e.code===1?'위치 권한을 허용해야 출석할 수 있어요. 브라우저 설정에서 위치를 허용해 주세요.':'위치를 못 찾았어요. 잠시 뒤 다시 눌러 주세요.','bad');return}
-      dist=Math.round(D(P.loc,{lat:c.latitude,lng:c.longitude}));acc=Math.round(c.accuracy||0);
+      dist=Math.round(D(E.loc,{lat:c.latitude,lng:c.longitude}));acc=Math.round(c.accuracy||0);
       const lim=(P.radius||300)+Math.min(acc,150);
-      if(dist>lim){ST.busy=false;say(`운동장에서 약 ${dist>=1000?(dist/1000).toFixed(1)+'km':dist+'m'} 떨어져 있어요. 도착하면 눌러 주세요.`,'bad');return}
+      if(dist>lim){ST.busy=false;say(`${E.loc.name||'운동장'}에서 약 ${dist>=1000?(dist/1000).toFixed(1)+'km':dist+'m'} 떨어져 있어요. 도착하면 눌러 주세요.`,'bad');return}
     }
     const id=today()+'_'+ST.me.pid,ref=F.doc(ST.db,'pub',ST.conf.code,'in',id);
     const ex=await F.getDoc(ref);
