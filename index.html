@@ -226,11 +226,17 @@ tr.grp td{background:var(--card);font-weight:700;font-size:.75rem;text-align:lef
 .pc.psub{background:light-dark(#e3f1e7,#173523);border-color:#2f8a46}
 .pc.pmain{background:var(--deep);color:#fff;border-color:var(--deep)}.pc.pmain small{color:#cfe6d6}
 .add{display:grid;gap:.5rem}
+[hidden]{display:none!important}
+.sec{border:1px solid var(--line);border-radius:.75rem;margin:.5rem 0;background:var(--card)}.sec>summary{font-weight:800;font-size:1rem;padding:.8rem .9rem;cursor:pointer;list-style:none;display:flex;align-items:center;gap:.5rem}.sec>summary::-webkit-details-marker{display:none}.sec>summary::after{content:'▾';margin-left:auto;color:var(--mute)}.sec[open]>summary::after{content:'▴'}.sec>summary small{font-weight:700;font-size:.75rem;color:var(--mute)}.sec>div{padding:0 .9rem .9rem}
 .cibox{display:grid;gap:.6rem}.cibox .row2{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.4rem}
 .cibox label{display:grid;gap:.15rem;font-size:.75rem;color:var(--mute);font-weight:700}.cibox input,.cibox select{min-height:2.5rem}
 .ciqr{display:grid;place-items:center;background:#fff;border-radius:.75rem;padding:.75rem;width:fit-content;margin:0 auto}.ciqr svg,.ciqr img{width:11rem;height:11rem;display:block}
 .cibind{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.3rem;max-height:14rem;overflow:auto}
 .cibind button{display:flex;justify-content:space-between;align-items:center;min-height:2.3rem;font-size:.8125rem;padding:0 .5rem}.cibind button small{color:var(--warn)}
+.dows{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.25rem}.dows button{padding:0;min-height:2.4rem}.dows button.on{background:var(--deep);color:#fff;border-color:var(--deep)}
+.gms{display:grid;gap:.3rem}.gm{display:grid;grid-template-columns:1fr auto;gap:.1rem .5rem;align-items:center;border:1px solid var(--line);border-radius:.6rem;padding:.4rem .6rem}.gm b{font-size:.875rem}.gm span{grid-column:1;font-size:.8125rem;color:var(--mute)}.gm button{grid-row:1/3;grid-column:2;min-height:2.2rem}
+.gadd{display:grid;gap:.4rem;border:1px dashed var(--line);border-radius:.6rem;padding:.6rem}
+#mapM{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex}#mapM[hidden]{display:none!important}.mbox{flex:1;display:flex;flex-direction:column;gap:.4rem;padding:.6rem;min-height:0}.mrow{display:flex;gap:.4rem}.mrow input{flex:1}#mapRes{display:grid;gap:.25rem}#mapRes button{text-align:left;font-size:.8125rem;min-height:2.3rem}.mwrap{position:relative;flex:1;min-height:40vh;border-radius:.75rem;overflow:hidden}#mapEl{position:absolute;inset:0}.mpin{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:500;font-size:2rem;font-weight:800;color:#d92d20;pointer-events:none;text-shadow:0 0 3px #fff}
 .cist{font-weight:700;font-size:.875rem}.cist.on{color:light-dark(#0f6b35,#7ee2a0)}.cist.off{color:var(--mute)}
 
 /* 알림 · 하단 탭 */
@@ -396,27 +402,35 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 </section>
 
 <section class="view" data-view="set" hidden>
-<h2>경기 설정</h2>
-<div class="btns" style="margin:0 0 .75rem"><button class="pri" id="toSimple2">간편 모드로 보기</button></div>
+<h2>설정</h2>
+<div class="btns" style="margin:0 0 .5rem"><button class="pri" id="toSimple2">간편 모드로 보기</button></div>
+<details class="sec" open><summary>경기</summary><div>
 <div class="ctrl">
 <label><span class="fl">기본 경기 방식</span><select id="mode"><option value="match">상대팀 경기</option><option value="scrim">자체전 (A팀 vs B팀)</option></select></label>
 <label><span class="fl">쿼터 수</span><select id="nq"></select></label>
+<label><span class="fl">포지션 글자</span><select id="pdSel"><option value="big">크게 (GK·DF·MF·FW)</option><option value="detail">세부 (CB·LB·CM·ST…)</option></select></label>
+<label><span class="fl">날짜</span><input type="date" id="gdate"></label>
 </div>
-<h3 class="sgrp">작전판 표시</h3>
-<div class="ctrl">
-<label style="grid-column:1/-1"><span class="fl">포지션 글자</span><select id="pdSel"><option value="big">크게 (GK·DF·MF·FW)</option><option value="detail">세부 (CB·LB·CM·ST…)</option></select></label>
-</div>
-<h3 class="sgrp">경기 날짜</h3>
-<div class="ctrl"><label><span class="fl">날짜</span><input type="date" id="gdate"></label></div>
-<div class="btns"><button class="pri" id="finishBtn">이번 경기 마치고 새 경기 준비</button><button id="resetBtn">쿼터 기록만 비우기 (출석 유지)</button></div>
+<div class="btns" style="margin-top:.5rem"><button class="pri" id="finishBtn">이번 경기 마치고 새 경기 준비</button><button id="resetBtn">쿼터 기록만 비우기 (출석 유지)</button></div>
 <p class="hint">"마치고 새 경기 준비"를 누르면 출석·쿼터가 비워지고, 지난 경기는 기록 탭에 남아요.</p>
-<h2 style="margin-top:1.5rem">서버 저장</h2>
+</div></details>
+<details class="sec"><summary>출석·경기 일정 <small id="sCi"></small></summary><div><div id="ciBox"></div></div></details>
+<details class="sec"><summary>말판 사진 읽기 <small id="sAi"></small></summary><div><div id="aiBox"></div></div></details>
+<details class="sec"><summary><span id="rsum">명단 편집</span></summary><div>
+<div class="add">
+<textarea id="newNames" rows="3" placeholder="쉼표나 줄바꿈으로 여러 명. 예: 홍길동 67 CB LB RB +  (첫 포지션이 메인, 나머지는 서브. 이미 있는 이름이면 정보만 수정)"></textarea>
+<div class="btns"><button class="dark" id="addBtn">추가 / 정보 수정</button></div>
+</div>
+<input type="text" id="rfind" placeholder="이름이나 직책으로 찾기" aria-label="명단 검색" style="max-width:640px;margin-top:.75rem">
+<div class="roster" id="roster"></div>
+</div></details>
+<details class="sec"><summary>서버 저장 <small id="sSy"></small></summary><div>
 <p class="systate" id="syState"></p>
 <div id="syBox">
 <div id="syForm" class="add">
 <p class="hint">Firebase에서 복사한 설정(firebaseConfig)을 그대로 붙여 넣고 연결하세요. 축구회 코드는 자동으로 만들어져요.</p>
 <textarea id="syCfg" rows="5" placeholder="const firebaseConfig = { apiKey: ..., projectId: ..., appId: ... };"></textarea>
-<label><span class="fl">축구회 코드</span><input type="text" id="syClub" style="padding-top:.95rem"></label>
+<input type="text" id="syClub" aria-label="축구회 코드" placeholder="축구회 코드">
 <div class="btns"><button class="pri" id="syConnect">서버에 연결</button></div>
 </div>
 <div id="syOn" hidden>
@@ -424,24 +438,14 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 <div class="btns"><button class="dark" id="syLink">운영진 연결 링크 복사</button><button id="syOff">이 휴대폰 연결 끊기</button></div>
 <textarea id="syLinkBox" rows="3" readonly hidden style="margin-top:.5rem"></textarea>
 <p class="hint" style="margin-top:.4rem">링크를 받은 운영진은 열기만 하면 같은 기록에 연결돼요. 링크가 있으면 누구나 수정할 수 있으니 운영진 단톡방에만 보내 주세요.</p>
-<h2 style="margin-top:1.5rem">회원 체크인</h2>
-<div id="ciBox"></div>
-<h2 style="margin-top:1.5rem">말판 사진 읽기</h2>
-<div id="aiBox"></div>
 </div>
 </div>
-<h2 style="margin-top:1.5rem">백업</h2>
-<p class="hint">기록은 이 휴대폰에만 저장돼요. 백업 글을 복사해 두면 다른 휴대폰에서 복원할 수 있어요.</p>
+</div></details>
+<details class="sec"><summary>백업</summary><div>
+<p class="hint">백업 글을 복사해 두면 다른 휴대폰에서 복원할 수 있어요.</p>
 <div class="btns"><button id="bkCopy">백업 글 복사</button><button id="bkLoad">붙여 넣은 백업으로 복원</button></div>
 <textarea id="bkBox" rows="3" placeholder="복원할 백업 글을 여기에 붙여 넣으세요" style="margin-top:.5rem"></textarea>
-<h2 id="rsum" style="margin-top:1.5rem">명단 편집</h2>
-<div class="add">
-<textarea id="newNames" rows="3" placeholder="쉼표나 줄바꿈으로 여러 명. 예: 홍길동 67 CB LB RB +  (첫 포지션이 메인, 나머지는 서브. 이미 있는 이름이면 정보만 수정)"></textarea>
-<div class="btns"><button class="dark" id="addBtn">추가 / 정보 수정</button></div>
-</div>
-<input type="text" id="rfind" placeholder="이름이나 직책으로 찾기" aria-label="명단 검색" style="max-width:640px;margin-top:.75rem">
-<div class="roster" id="roster"></div>
-<p class="note">기록은 이 휴대폰에 저장되고, 서버에 연결하면 서버에도 함께 저장돼요.</p>
+</div></details>
 </section>
 
 </div></main>
@@ -797,7 +801,7 @@ function posPanel(p){
   return `<div class="ppanel"><p class="cur">${p.pos.length?`메인 <b>★${p.pos[0]} ${PN[p.pos[0]]}</b>${p.pos.length>1?` · 서브 ${p.pos.slice(1).join(', ')}`:''}`:'아직 포지션이 없어요'}${p.pos.length?` <button class="pclr" data-pid="${p.id}" data-pclr="1">모두 해제</button>`:''}</p><p class="hint">한 번 누르면 서브, 서브를 한 번 더 누르면 메인(★), 메인을 누르면 해제돼요.</p>${PG.map(([g,cs])=>`<div class="pgrp"><span>${g}</span>${cs.map(c=>{const k=p.pos.indexOf(c);return `<button class="pc ${k===0?'pmain':k>0?'psub':''}" data-pid="${p.id}" data-pc="${c}" title="${PN[c]}">${k===0?'★':''}${c}<small>${PN[c]}</small></button>`}).join('')}</div>`).join('')}</div>`;
 }
 function renderRoster(){
-  $('rsum').textContent=`명단 편집 (전체 ${S.players.length}명 · 출석 ${S.players.filter(p=>p.here).length}명)`;
+  $('rsum').textContent=`명단 편집 · ${S.players.length}명`;
   const f=($('rfind').value||'').trim();
   let bound=new Set(),arm='';try{bound=new Set(CI.binds.map(b=>b.id));arm=CI.bindArm}catch(e){}
   $('roster').innerHTML=S.players.filter(p=>!f||p.name.includes(f)||p.role.includes(f)).map(p=>`<div class="rrow"><span>${esc(p.name)}${p.role?` <small class="ag">${esc(p.role)}</small>`:''}${bound.has(p.id)?' <small class="ag" style="color:#16a34a;font-weight:700">휴대폰 등록됨</small>':''}</span>${bound.has(p.id)?`<button class="on" data-unbind="${p.id}">${arm===p.id?'한 번 더 누르면 해제':'휴대폰 해제'}</button>`:''}<button class="${p.here?'on':''}" data-here="${p.id}">${p.here?'출석':'불참'}</button><button data-age="${p.id}">${agL(p)}</button><button data-lv="${p.id}">실력 ${LV[p.level]}</button><button class="pzs ${openPos===p.id?'on':''}" data-pp="${p.id}" title="${posTxt(p)}">${posShort(p)} ${openPos===p.id?'▲':'▼'}</button>${openPos===p.id?posPanel(p):''}<button data-del="${p.id}" aria-label="${esc(p.name)} 삭제">삭제</button></div>`).join('');
@@ -1217,7 +1221,7 @@ async function syStart(){
 
 /* ---- 회원 체크인 ---- */
 const CI={code:'',day:'',unIn:null,unBind:null,binds:[],lastPub:'',pubT:0,bindArm:'',qr:null,locBusy:false};
-function ciNorm(){if(!S.ci||typeof S.ci!=='object')S.ci={};const dft={on:false,code:'',loc:null,radius:300,from:'05:00',to:'11:00'};for(const k in dft)if(!(k in S.ci))S.ci[k]=dft[k];if(!S.ciDone||typeof S.ciDone!=='object'||!Array.isArray(S.ciDone.ids))S.ciDone={date:'',ids:[]};if(!S.ai||typeof S.ai!=='object')S.ai={on:false,model:'gemini-3.5-flash'}}
+function ciNorm(){if(!S.ci||typeof S.ci!=='object')S.ci={};const dft={on:false,code:'',loc:null,radius:300,from:'05:00',to:'11:00'};for(const k in dft)if(!(k in S.ci))S.ci[k]=dft[k];if(!S.ciDone||typeof S.ciDone!=='object'||!Array.isArray(S.ciDone.ids))S.ciDone={date:'',ids:[]};if(!S.ai||typeof S.ai!=='object')S.ai={on:false,model:'gemini-3.5-flash'};if(!S.sched||typeof S.sched!=='object')S.sched={home:{name:'아현중학교 운동장',lat:S.ci.loc?S.ci.loc.lat:null,lng:S.ci.loc?S.ci.loc.lng:null},weekly:{0:{from:S.ci.from||'05:00',to:S.ci.to||'11:00'}},games:[]};if(!S.sched.home)S.sched.home={name:'아현중학교 운동장',lat:null,lng:null};if(!S.sched.weekly||typeof S.sched.weekly!=='object')S.sched.weekly={};if(!Array.isArray(S.sched.games))S.sched.games=[]}
 const newCode=()=>'ci-'+Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>'abcdefghjkmnpqrstuvwxyz23456789'[b%31]).join('');
 function ciUnsub(){if(CI.unIn)CI.unIn();if(CI.unBind)CI.unBind();CI.unIn=CI.unBind=null;CI.code='';CI.day=''}
 function ciTick(){
@@ -1229,7 +1233,7 @@ function ciTick(){
     CI.unIn=F.onSnapshot(F.query(F.collection(db,'pub',c.code,'in'),F.where('date','==',CI.day)),qs=>ciApply(qs.docs.map(d=>Object.assign({id:d.id},d.data()))),()=>{});
     CI.unBind=F.onSnapshot(F.collection(db,'pub',c.code,'bind'),qs=>{CI.binds=qs.docs.map(d=>Object.assign({id:d.id},d.data()));renderCi();renderRoster()},()=>{});
   }
-  const pub={title:'벤치제로',on:!!c.on,loc:c.loc||null,radius:+c.radius||300,from:c.from,to:c.to,names:S.players.map(p=>({id:p.id,name:p.name,age:p.age||null}))};
+  const pub={title:'벤치제로',on:!!c.on,radius:+c.radius||300,sched:{home:S.sched.home,weekly:S.sched.weekly,games:S.sched.games.filter(g=>g.date>=today())},names:S.players.map(p=>({id:p.id,name:p.name,age:p.age||null}))};
   const k=JSON.stringify(pub);
   if(k!==CI.lastPub){clearTimeout(CI.pubT);CI.pubT=setTimeout(()=>{F.setDoc(F.doc(db,'pub',c.code),Object.assign(pub,{upd:Date.now()})).then(()=>{CI.lastPub=k}).catch(()=>{})},800)}
   renderCi();
@@ -1262,27 +1266,39 @@ function renderCi(){
   const opt=(v)=>H.map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join('');
   const bound=CI.binds.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'ko'));
   const url=ciLink();
+  const ae=document.activeElement;if(!CI.force&&ae&&box.contains(ae)&&ae.tagName==='INPUT'&&ae.type==='text')return;CI.force=false;
+  const sc=S.sched,DN=['일','월','화','수','목','금','토'],gs=sc.games.filter(g=>g.date>=today()).sort((x,y)=>x.date.localeCompare(y.date));
+  if(!CI.dr)CI.dr={date:'',from:'05:00',to:'11:00',mode:'match',opp:'',place:null};const dr=CI.dr;
   box.innerHTML=`<div class="cibox">
   <p class="cist on">● 켜짐 · 오늘 체크인 ${CI.count||0}명 · 등록된 휴대폰 ${bound.length}대</p>
   <div class="ciqr" id="ciQr"></div>
   <div class="btns"><button class="dark" data-ci="link">회원용 출석 링크 복사</button><button data-ci="off">끄기</button></div>
   <textarea id="ciLinkBox" rows="2" readonly hidden></textarea>
   <p class="hint">QR을 인쇄해서 운동장에 붙이거나 링크를 회원 단톡방에 보내 주세요. 이 링크로는 출석만 할 수 있고 기록은 고칠 수 없어요.</p>
-  <p class="cist ${c.loc?'on':'off'}">${c.loc?`운동장 위치 저장됨 · 반경 ${c.radius}m 안에서만 출석`:'운동장 위치 없음 · 어디서나 출석돼요'}</p>
-  <div class="btns"><button data-ci="loc">${CI.locBusy?'위치 찾는 중…':c.loc?'지금 위치로 다시 저장':'지금 내 위치를 운동장으로 저장'}</button>${c.loc?'<button data-ci="noloc">위치 확인 끄기</button>':''}</div>
-  <div class="row2"><label>반경<select data-cs="radius">${[150,300,500,1000].map(r=>`<option value="${r}" ${+c.radius===r?'selected':''}>${r}m</option>`).join('')}</select></label>
-  <label>열리는 시각<select data-cs="from">${opt(c.from)}</select></label><label>닫히는 시각<select data-cs="to">${opt(c.to)}</select></label></div>
-  <p class="hint">운동장에서 <b>지금 내 위치를 운동장으로 저장</b>을 한 번 눌러 두세요. 그 뒤로는 반경 밖에서 누르면 출석이 안 돼요.</p>
+  <p class="cist">출석 반경</p>
+  <div class="row2"><label>반경<select data-cs="radius">${[150,300,500,1000].map(r=>`<option value="${r}" ${+c.radius===r?'selected':''}>${r}m</option>`).join('')}</select></label></div>
+  <p class="cist ${sc.home.lat?'on':'off'}">홈 구장 · ${esc(sc.home.name)}${sc.home.lat?'':' (위치 없음 · 어디서나 출석돼요)'}</p>
+  <div class="btns"><button data-ci="home">${sc.home.lat?'홈 구장 위치 바꾸기':'지도에서 홈 구장 위치 정하기'}</button></div>
+  <p class="cist">정기 경기 요일 (누르면 켜고 꺼요)</p>
+  <div class="dows">${DN.map((d,i)=>`<button class="${sc.weekly[i]?'on':''}" data-dow="${i}">${d}</button>`).join('')}</div>
+  ${Object.keys(sc.weekly).sort().map(i=>`<div class="row2"><label>${DN[i]}요일 출석 열림<select data-wk="${i}:from">${opt(sc.weekly[i].from)}</select></label><label>닫힘<select data-wk="${i}:to">${opt(sc.weekly[i].to)}</select></label></div>`).join('')}
+  <p class="hint">정기 요일에는 홈 구장에서 위 시간에 출석이 열려요. 원정·시간 변경·상대팀은 아래에 그 날짜 경기를 추가하면 그날만 바뀌어요.</p>
+  <p class="cist">예정 경기 ${gs.length}개</p>
+  <div class="gms">${gs.length?gs.map(g=>`<div class="gm"><b>${g.date.slice(5).replace('-','/')}(${DN[new Date(g.date+'T00:00').getDay()]}) ${g.from}~${g.to}</b><span>${esc(g.place?g.place.name:sc.home.name)}${g.opp?' · vs '+esc(g.opp):''}${g.mode==='scrim'?' · 자체전':''}</span><button data-gdel="${g.date}">삭제</button></div>`).join(''):'<p class="hint">따로 추가한 경기가 없어요.</p>'}</div>
+  <div class="gadd"><label>날짜<input type="date" data-gd="date" value="${esc(dr.date)}" min="${today()}"></label>
+  <div class="row2"><label>열림<select data-gd="from">${opt(dr.from)}</select></label><label>닫힘<select data-gd="to">${opt(dr.to)}</select></label><label>방식<select data-gd="mode"><option value="match" ${dr.mode==='match'?'selected':''}>상대팀</option><option value="scrim" ${dr.mode==='scrim'?'selected':''}>자체전</option></select></label></div>
+  <label>상대팀<input type="text" data-gd="opp" value="${esc(dr.opp)}" placeholder="없으면 비워 두기" autocomplete="off"></label>
+  <div class="btns"><button data-ci="gplace">장소: ${esc(dr.place?dr.place.name:sc.home.name+' (홈)')}</button>${dr.place?'<button data-ci="gphome">홈으로</button>':''}<button class="pri" data-ci="gadd">경기 추가</button></div></div>
   <p class="cist">등록된 휴대폰 (휴대폰을 바꾼 회원은 눌러서 해제)</p>
   <div class="cibind">${bound.length?bound.map(b=>`<button data-unbind="${esc(b.id)}">${esc(b.name)}<small>${CI.bindArm===b.id?'한 번 더 누르면 해제':''}</small></button>`).join(''):'<p class="hint">아직 등록한 회원이 없어요.</p>'}</div>
-  <p class="hint">한 사람은 휴대폰 한 대에만 등록되고, 정해진 시간과 운동장 반경 안에서만 출석돼요. 회원 도착 목록은 모두에게 보여서 대리 출석이 바로 드러나요.</p>
+  <p class="hint">한 사람은 휴대폰 한 대에만 등록되고, 경기 날 정해진 시간에 구장 반경 안에서만 출석돼요. 회원 도착 목록은 모두에게 보여서 대리 출석이 바로 드러나요.</p>
   </div>`;
   ciQR(url);
 }
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-ci]');
   if(b){ciNorm();const c=S.ci,a=b.dataset.ci;
-    if(a==='on'){if(!c.code)c.code=newCode();c.on=true;render();ciTick();say('회원 체크인을 켰어요. 운동장에서 위치를 한 번 저장해 주세요.')}
+    if(a==='on'){if(!c.code)c.code=newCode();c.on=true;render();ciTick();say('회원 체크인을 켰어요. 홈 구장 위치와 경기 요일을 확인해 주세요.')}
     else if(a==='off'){c.on=false;render();ciTick();say('회원 체크인을 껐어요. 회원 화면에 "출석 닫힘"으로 보여요.')}
     else if(a==='link'){const url=ciLink(),box=$('ciLinkBox');try{navigator.clipboard.writeText(url).then(()=>say('회원용 출석 링크를 복사했어요.'),()=>{box.hidden=false;box.value=url;box.select()})}catch(err){box.hidden=false;box.value=url;box.select()}}
     else if(a==='noloc'){c.loc=null;render();ciTick();say('위치 확인을 껐어요.')}
@@ -1294,8 +1310,47 @@ document.addEventListener('click',e=>{
   if(u){const id=u.dataset.unbind;if(CI.bindArm!==id){CI.bindArm=id;renderCi();renderRoster();setTimeout(()=>{if(CI.bindArm===id){CI.bindArm='';renderCi();renderRoster()}},4000);return}
     CI.bindArm='';SY.F.deleteDoc(SY.F.doc(SY.db,'pub',S.ci.code,'bind',id)).then(()=>say('휴대폰 등록을 해제했어요. 새 휴대폰에서 이름을 다시 고르면 돼요.')).catch(()=>say('해제하지 못했어요. 인터넷 연결을 확인해 주세요.'))}
 });
-document.addEventListener('change',e=>{const t=e.target.closest('[data-cs]');if(!t)return;ciNorm();S.ci[t.dataset.cs]=t.dataset.cs==='radius'?+t.value:t.value;render();ciTick()});
+document.addEventListener('change',e=>{const t=e.target.closest('[data-cs]');if(!t)return;ciNorm();S.ci[t.dataset.cs]=t.dataset.cs==='radius'?+t.value:t.value;CI.force=true;render();ciTick()});
 
+
+/* ---- 경기 일정 · 지도 ---- */
+let MAPL=null;
+function loadLeaflet(){if(window.L)return Promise.resolve();if(!MAPL)MAPL=new Promise((res,rej)=>{const c=document.createElement('link');c.rel='stylesheet';c.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(c);const sc=document.createElement('script');sc.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';sc.onload=res;sc.onerror=()=>{MAPL=null;rej()};document.head.appendChild(sc)});return MAPL}
+const MP={map:null,circle:null,cb:null};
+function openMap(init,cb){
+  let m=$('mapM');
+  if(!m){m=document.createElement('div');m.id='mapM';m.innerHTML=`<div class="mbox"><div class="mrow"><input type="text" id="mapQ" placeholder="구장 이름이나 주소 검색" autocomplete="off"><button class="dark" id="mapGo">검색</button></div><div id="mapRes"></div><div class="mwrap"><div id="mapEl"></div><div class="mpin">＋</div></div><input type="text" id="mapName" placeholder="장소 이름 (예: ○○초등학교 운동장)" autocomplete="off"><div class="btns"><button id="mapMine">내 위치</button><button id="mapCancel">취소</button><button class="pri" id="mapOk">가운데 위치로 저장</button></div></div>`;document.body.appendChild(m);
+    $('mapCancel').onclick=()=>{m.hidden=true};
+    $('mapOk').onclick=()=>{if(!MP.map)return;const c=MP.map.getCenter(),name=($('mapName').value||'').trim()||'이름 없는 구장';m.hidden=true;MP.cb&&MP.cb({name,lat:+c.lat.toFixed(6),lng:+c.lng.toFixed(6)})};
+    $('mapMine').onclick=()=>{if(!navigator.geolocation)return say('이 휴대폰에서는 위치를 쓸 수 없어요.');navigator.geolocation.getCurrentPosition(p=>MP.map&&MP.map.setView([p.coords.latitude,p.coords.longitude],18),()=>say('위치를 못 찾았어요.'),{enableHighAccuracy:true,timeout:15000})};
+    const go=async()=>{const q=($('mapQ').value||'').trim();if(!q)return;$('mapRes').innerHTML='<p class="hint">찾는 중…</p>';
+      try{const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=kr&accept-language=ko&q='+encodeURIComponent(q));const j=await r.json();
+        $('mapRes').innerHTML=j.length?j.map((x,i)=>`<button data-mr="${i}">${esc(String(x.display_name).split(',').slice(0,3).join(','))}</button>`).join(''):'<p class="hint">검색 결과가 없어요. 지도를 직접 움직여 맞춰 주세요.</p>';
+        $('mapRes').onclick=e=>{const b=e.target.closest('[data-mr]');if(!b)return;const x=j[+b.dataset.mr];MP.map.setView([+x.lat,+x.lon],18);if(!$('mapName').value)$('mapName').value=String(x.display_name).split(',')[0];$('mapRes').innerHTML=''}}
+      catch(e){$('mapRes').innerHTML='<p class="hint">검색하지 못했어요. 지도를 직접 움직여 맞춰 주세요.</p>'}};
+    $('mapGo').onclick=go;$('mapQ').onkeydown=e=>{if(e.key==='Enter')go()}}
+  m.hidden=false;MP.cb=cb;$('mapName').value=init&&init.name||'';$('mapQ').value='';$('mapRes').innerHTML='';
+  const at=init&&init.lat?[init.lat,init.lng]:(S.sched.home.lat?[S.sched.home.lat,S.sched.home.lng]:[37.5547,126.9560]);
+  loadLeaflet().then(()=>{if(!MP.map){MP.map=L.map('mapEl',{zoomControl:true}).setView(at,17);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(MP.map);MP.circle=L.circle(at,{radius:+S.ci.radius||300,color:'#16a34a',weight:1,fillOpacity:.12}).addTo(MP.map);MP.map.on('move',()=>MP.circle.setLatLng(MP.map.getCenter()))}
+    else MP.map.setView(at,17);MP.circle.setRadius(+S.ci.radius||300);MP.circle.setLatLng(at);setTimeout(()=>MP.map.invalidateSize(),50)},()=>{$('mapRes').innerHTML='<p class="hint">지도를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.</p>'});
+}
+function ciRe(){CI.force=true;render();ciTick()}
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-ci]');const a=t&&t.dataset.ci;
+  if(a==='home'){ciNorm();openMap(S.sched.home,v=>{S.sched.home=v;ciRe();say(`홈 구장을 ${v.name}(으)로 저장했어요.`)});return}
+  if(a==='gplace'){ciNorm();openMap(CI.dr.place||S.sched.home,v=>{CI.dr.place=v;CI.force=true;renderCi()});return}
+  if(a==='gphome'){CI.dr.place=null;CI.force=true;renderCi();return}
+  if(a==='gadd'){ciNorm();const d=CI.dr;if(!d.date){say('경기 날짜를 골라 주세요.');return}
+    S.sched.games=S.sched.games.filter(g=>g.date!==d.date&&g.date>=today());S.sched.games.push({date:d.date,from:d.from,to:d.to,mode:d.mode,opp:d.opp.trim(),place:d.place});
+    CI.dr=null;ciRe();say(`${d.date} 경기를 추가했어요. 그날은 이 설정으로 출석이 열려요.`);return}
+  const w=e.target.closest('[data-dow]');if(w){ciNorm();const i=w.dataset.dow;if(S.sched.weekly[i])delete S.sched.weekly[i];else S.sched.weekly[i]={from:'05:00',to:'11:00'};ciRe();return}
+  const g=e.target.closest('[data-gdel]');if(g){ciNorm();S.sched.games=S.sched.games.filter(x=>x.date!==g.dataset.gdel);ciRe();say('경기를 지웠어요.')}
+});
+document.addEventListener('change',e=>{
+  const w=e.target.closest('[data-wk]');if(w){ciNorm();const [i,k]=w.dataset.wk.split(':');if(S.sched.weekly[i]){S.sched.weekly[i][k]=w.value;ciRe()}return}
+  const d=e.target.closest('[data-gd]');if(d&&CI.dr){CI.dr[d.dataset.gd]=d.value}
+});
+document.addEventListener('input',e=>{const d=e.target.closest('[data-gd]');if(d&&CI.dr)CI.dr[d.dataset.gd]=d.value});
 /* ---- 말판 사진 읽기 (Firebase AI Logic · Gemini 무료 등급) ---- */
 const blobB64=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(b)});
 async function geminiSample(prompt,opts){
@@ -1330,6 +1385,7 @@ function renderSync(){
   $('syForm').hidden=on;$('syOn').hidden=!on;
   if(!on&&!$('syClub').value)$('syClub').value=newClub();
   renderCi();renderAi();
+  try{ciNorm();$('sCi').textContent=!SY.ref?'':S.ci.on?'· 켜짐':'· 꺼짐';$('sAi').textContent=!SY.ref?'':S.ai.on?'· 켜짐':'· 꺼짐';$('sSy').textContent=on?'· 연결됨':'· 연결 안 됨'}catch(e){}
   if(on)$('syInfo').textContent=`프로젝트 ${SY.cfg.projectId} · 축구회 코드 ${SY.club}`;
   const n=$('nSet');if(n)n.textContent=SY.status==='ok'||SY.status==='saving'?'☁ 저장됨':SY.status==='err'?'⚠ 오류':' ';
 }
