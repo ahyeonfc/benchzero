@@ -235,6 +235,7 @@ tr.grp td{background:var(--card);font-weight:700;font-size:.75rem;text-align:lef
 .cibind button{display:flex;justify-content:space-between;align-items:center;min-height:2.3rem;font-size:.8125rem;padding:0 .5rem}.cibind button small{color:var(--warn)}
 .dows{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.25rem}.dows button{padding:0;min-height:2.4rem}.dows button.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 .gms{display:grid;gap:.3rem}.gm{display:grid;grid-template-columns:1fr auto;gap:.1rem .5rem;align-items:center;border:1px solid var(--line);border-radius:.6rem;padding:.4rem .6rem}.gm b{font-size:.875rem}.gm span{grid-column:1;font-size:.8125rem;color:var(--mute)}.gm button{grid-row:1/3;grid-column:2;min-height:2.2rem}
+.gaddw>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;min-height:2.5rem;padding:0 .9rem;border-radius:.625rem;border:1px solid #e0bb00;background:var(--bib);color:#2c2500;font-weight:700}.gaddw>summary::-webkit-details-marker{display:none}.gaddw[open]>summary{margin-bottom:.5rem}
 .gadd{display:grid;gap:.4rem;border:1px dashed var(--line);border-radius:.6rem;padding:.6rem}
 #mapM{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex}#mapM[hidden]{display:none!important}.mbox{flex:1;display:flex;flex-direction:column;gap:.4rem;padding:.6rem;min-height:0}.mrow{display:flex;gap:.4rem}.mrow input{flex:1}#mapRes{display:grid;gap:.25rem}#mapRes button{text-align:left;font-size:.8125rem;min-height:2.3rem}.mwrap{position:relative;flex:1;min-height:40vh;border-radius:.75rem;overflow:hidden}#mapEl{position:absolute;inset:0}.mpin{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:500;font-size:2rem;font-weight:800;color:#d92d20;pointer-events:none;text-shadow:0 0 3px #fff}
 .evsel{margin:0 0 .4rem}.evsel select{width:100%;min-height:2.2rem;font-weight:800;border-radius:.6rem;border:1px solid var(--deep);background:var(--deep);color:#fff;padding:0 .6rem}.evsel:empty{display:none}
@@ -408,7 +409,7 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 <section class="view" data-view="set" hidden>
 <h2>설정</h2>
 <div class="btns" style="margin:0 0 .5rem"><button class="pri" id="toSimple2">간편 모드로 보기</button></div>
-<details class="sec" open><summary>경기</summary><div>
+<details class="sec" open><summary>경기 일정·설정</summary><div>
 <div class="evsel"></div>
 <p class="cist" id="gInfo" style="margin:0 0 .5rem"></p>
 <div class="ctrl">
@@ -418,9 +419,10 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 <label hidden><span class="fl">날짜</span><input type="date" id="gdate"></label>
 </div>
 <div class="btns" style="margin-top:.5rem"><button class="pri" id="finishBtn" hidden>이번 경기 마치고 새 경기 준비</button><button id="resetBtn">쿼터 기록만 비우기 (출석 유지)</button></div>
-<p class="hint">경기는 위에서 골라요. 경기마다 출석·작전판·현황이 따로 저장되고, 시작한 경기는 기록 탭에 남아요. 경기 등록은 아래 "출석·경기 일정"에서 해요.</p>
+<p class="hint">맨 위에서 경기를 고르면 그 경기의 출석·작전판·현황이 열려요. 방식과 쿼터 수는 고른 경기에만 적용돼요.</p>
+<div id="scBox"></div>
 </div></details>
-<details class="sec"><summary>출석·경기 일정 <small id="sCi"></small></summary><div><div id="ciBox"></div></div></details>
+<details class="sec"><summary>회원 출석 (QR·링크) <small id="sCi"></small></summary><div><div id="ciBox"></div></div></details>
 <details class="sec"><summary>말판 사진 읽기 <small id="sAi"></small></summary><div><div id="aiBox"></div></div></details>
 <details class="sec"><summary><span id="rsum">명단 편집</span></summary><div>
 <div class="add">
@@ -863,7 +865,8 @@ function schedApply(){evEnsure();const e=evCur();if(e&&e.reg&&e.mode!==S.mode&&!
 function renderEv(){const L=evList(),h=L.length?`<select data-ev aria-label="경기 선택">${L.map(e=>`<option value="${esc(e.id)}" ${e.id===S.evId?'selected':''}>${esc(evLabel(e))}</option>`).join('')}</select>`:'';document.querySelectorAll('.evsel').forEach(x=>{if(x.dataset.h!==h){x.dataset.h=h;x.innerHTML=h}})}
 document.addEventListener('change',e=>{const t=e.target.closest('[data-ev]');if(t)evSwitch(t.value)});
 function renderCtrl(){
-  {const e=evCur(),gi=$('gInfo');if(gi){gi.className='cist '+(e?'on':'off');gi.textContent=e?(e.reg?'등록된 경기 · ':'정기 경기 · ')+schedTxt(e):'등록된 경기 일정이 없어요. 아래 "출석·경기 일정"에서 요일이나 경기를 등록해 주세요.'}}
+  try{renderSched()}catch(e){}
+  {const e=evCur(),gi=$('gInfo');if(gi){gi.className='cist '+(e?'on':'off');gi.textContent=e?'지금 고른 경기 · '+schedTxt(e):'경기 일정이 없어요. 아래에서 정기 요일을 켜거나 경기를 추가해 주세요.'}}
   renderEv();
   $('pdSel').value=S.pd==='detail'?'detail':'big';
   $('gdate').value=S.date;
@@ -1296,7 +1299,32 @@ function ciQR(url){
   if(!CI.qr){CI.qr=new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='qrcode.js';sc.onload=res;sc.onerror=rej;document.head.appendChild(sc)})}
   CI.qr.then(draw,()=>{box.textContent='QR을 만들지 못했어요'});
 }
+function renderSched(){
+  const box=$('scBox');if(!box)return;try{ciNorm()}catch(e){return}
+  let force=true;try{force=CI.force}catch(e){}
+  const ae=document.activeElement;if(!force&&ae&&box.contains(ae)&&ae.tagName==='INPUT'&&ae.type==='text')return;
+  const H=[];for(let h=0;h<=23;h++)for(const m of['00','30'])H.push(String(h).padStart(2,'0')+':'+m);H.push('23:59');
+  const opt=(v)=>H.map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join('');
+  const sc=S.sched,DN=['일','월','화','수','목','금','토'],gs=sc.games.filter(g=>g.date>=today()).sort((x,y)=>x.date.localeCompare(y.date)||x.from.localeCompare(y.from));
+  try{if(!CI.dr)CI.dr={date:'',from:'07:00',to:'09:00',mode:'match',opp:'',place:null}}catch(e){return}const dr=CI.dr;
+  const was=box.querySelector('.gaddw')?box.querySelector('.gaddw').open:false;
+  box.innerHTML=`<div class="cibox">
+  <p class="cist">직접 등록한 경기 ${gs.length}개</p>
+  <div class="gms">${gs.length?gs.map(g=>`<div class="gm"><b>${g.date.slice(5).replace('-','/')}(${DN[new Date(g.date+'T00:00').getDay()]}) ${g.from}~${g.to}</b><span>${esc(g.place?g.place.name:sc.home.name)}${g.opp?' · vs '+esc(g.opp):''}${g.mode==='scrim'?' · 자체전':''}</span><button data-gdel="${esc(g.id||g.date)}">삭제</button></div>`).join(''):'<p class="hint">따로 추가한 경기가 없어요.</p>'}</div>
+  <details class="gaddw" ${was||dr.date||dr.opp||dr.place?'open':''}><summary class="pri">+ 경기 추가</summary>
+  <div class="gadd"><label>날짜<input type="date" data-gd="date" value="${esc(dr.date)}" min="${today()}"></label>
+  <div class="row2"><label>시작<select data-gd="from">${opt(dr.from)}</select></label><label>끝<select data-gd="to">${opt(dr.to)}</select></label><label>방식<select data-gd="mode"><option value="match" ${dr.mode==='match'?'selected':''}>상대팀</option><option value="scrim" ${dr.mode==='scrim'?'selected':''}>자체전</option></select></label></div>
+  <label>상대팀<input type="text" data-gd="opp" value="${esc(dr.opp)}" placeholder="없으면 비워 두기" autocomplete="off"></label>
+  <div class="btns"><button data-ci="gplace">장소: ${esc(dr.place?dr.place.name:sc.home.name+' (홈)')}</button>${dr.place?'<button data-ci="gphome">홈으로</button>':''}<button class="pri" data-ci="gadd">경기 추가</button></div></div>
+  </details>
+  <p class="cist">정기 경기 요일 (누르면 켜고 꺼요)</p>
+  <div class="dows">${DN.map((d,i)=>`<button class="${sc.weekly[i]?'on':''}" data-dow="${i}">${d}</button>`).join('')}</div>
+  ${Object.keys(sc.weekly).sort().map(i=>`<div class="row2"><label>${DN[i]}요일 시작<select data-wk="${i}:from">${opt(sc.weekly[i].from)}</select></label><label>끝<select data-wk="${i}:to">${opt(sc.weekly[i].to)}</select></label></div>`).join('')}
+  <p class="hint">정기 요일에는 매주 홈 구장 경기가 자동으로 생겨요. 직접 경기를 등록한 날은 등록한 경기만 열려요. 회원 출석은 경기 시작 1시간 전부터 끝날 때까지 열려요.</p>
+  </div>`;
+}
 function renderCi(){
+  renderSched();
   const box=$('ciBox');if(!box)return;ciNorm();const c=S.ci;
   if(!SY.ref){box.innerHTML='<p class="hint">서버에 연결하면 쓸 수 있어요.</p>';return}
   if(!c.code||!c.on){box.innerHTML=`<div class="cibox"><p class="hint">회원이 운동장에 도착해서 자기 휴대폰으로 <b>도착</b> 버튼을 누르면, 도착 순서대로 여기 출석이 자동으로 찍혀요. 로그인은 필요 없어요.</p><div class="btns"><button class="pri" data-ci="on">회원 체크인 켜기</button></div></div>`;return}
@@ -1317,19 +1345,9 @@ function renderCi(){
   <div class="row2"><label>반경<select data-cs="radius">${[150,300,500,1000].map(r=>`<option value="${r}" ${+c.radius===r?'selected':''}>${r}m</option>`).join('')}</select></label></div>
   <p class="cist ${sc.home.lat?'on':'off'}">홈 구장 · ${esc(sc.home.name)}${sc.home.lat?'':' (위치 없음 · 어디서나 출석돼요)'}</p>
   <div class="btns"><button data-ci="home">${sc.home.lat?'홈 구장 위치 바꾸기':'지도에서 홈 구장 위치 정하기'}</button></div>
-  <p class="cist">정기 경기 요일 (누르면 켜고 꺼요)</p>
-  <div class="dows">${DN.map((d,i)=>`<button class="${sc.weekly[i]?'on':''}" data-dow="${i}">${d}</button>`).join('')}</div>
-  ${Object.keys(sc.weekly).sort().map(i=>`<div class="row2"><label>${DN[i]}요일 출석 열림<select data-wk="${i}:from">${opt(sc.weekly[i].from)}</select></label><label>닫힘<select data-wk="${i}:to">${opt(sc.weekly[i].to)}</select></label></div>`).join('')}
-  <p class="hint">정기 요일에는 홈 구장에서 위 시간에 출석이 열려요. 원정·상대팀 경기는 아래에 추가해요. 같은 날 여러 경기도 넣을 수 있고, 경기를 추가한 날은 정기 경기 대신 추가한 경기만 열려요.</p>
-  <p class="cist">예정 경기 ${gs.length}개</p>
-  <div class="gms">${gs.length?gs.map(g=>`<div class="gm"><b>${g.date.slice(5).replace('-','/')}(${DN[new Date(g.date+'T00:00').getDay()]}) ${g.from}~${g.to}</b><span>${esc(g.place?g.place.name:sc.home.name)}${g.opp?' · vs '+esc(g.opp):''}${g.mode==='scrim'?' · 자체전':''}</span><button data-gdel="${esc(g.id||g.date)}">삭제</button></div>`).join(''):'<p class="hint">따로 추가한 경기가 없어요.</p>'}</div>
-  <div class="gadd"><label>날짜<input type="date" data-gd="date" value="${esc(dr.date)}" min="${today()}"></label>
-  <div class="row2"><label>열림<select data-gd="from">${opt(dr.from)}</select></label><label>닫힘<select data-gd="to">${opt(dr.to)}</select></label><label>방식<select data-gd="mode"><option value="match" ${dr.mode==='match'?'selected':''}>상대팀</option><option value="scrim" ${dr.mode==='scrim'?'selected':''}>자체전</option></select></label></div>
-  <label>상대팀<input type="text" data-gd="opp" value="${esc(dr.opp)}" placeholder="없으면 비워 두기" autocomplete="off"></label>
-  <div class="btns"><button data-ci="gplace">장소: ${esc(dr.place?dr.place.name:sc.home.name+' (홈)')}</button>${dr.place?'<button data-ci="gphome">홈으로</button>':''}<button class="pri" data-ci="gadd">경기 추가</button></div></div>
   <p class="cist">등록된 휴대폰 (휴대폰을 바꾼 회원은 눌러서 해제)</p>
   <div class="cibind">${bound.length?bound.map(b=>`<button data-unbind="${esc(b.id)}">${esc(b.name)}<small>${CI.bindArm===b.id?'한 번 더 누르면 해제':''}</small></button>`).join(''):'<p class="hint">아직 등록한 회원이 없어요.</p>'}</div>
-  <p class="hint">한 사람은 휴대폰 한 대에만 등록되고, 경기 날 정해진 시간에 구장 반경 안에서만 출석돼요. 회원 도착 목록은 모두에게 보여서 대리 출석이 바로 드러나요.</p>
+  <p class="hint">한 사람은 휴대폰 한 대에만 등록되고, 경기 시작 1시간 전부터 구장 반경 안에서만 출석돼요. 회원 도착 목록은 모두에게 보여서 대리 출석이 바로 드러나요.</p>
   </div>`;
   ciQR(url);
 }
@@ -1376,12 +1394,12 @@ function ciRe(){CI.force=true;schedApply();render();ciTick()}
 document.addEventListener('click',e=>{
   const t=e.target.closest('[data-ci]');const a=t&&t.dataset.ci;
   if(a==='home'){ciNorm();openMap(S.sched.home,v=>{S.sched.home=v;ciRe();say(`홈 구장을 ${v.name}(으)로 저장했어요.`)});return}
-  if(a==='gplace'){ciNorm();openMap(CI.dr.place||S.sched.home,v=>{CI.dr.place=v;CI.force=true;renderCi()});return}
-  if(a==='gphome'){CI.dr.place=null;CI.force=true;renderCi();return}
+  if(a==='gplace'){ciNorm();openMap(CI.dr.place||S.sched.home,v=>{CI.dr.place=v;CI.force=true;renderSched();renderCi()});return}
+  if(a==='gphome'){CI.dr.place=null;CI.force=true;renderSched();renderCi();return}
   if(a==='gadd'){ciNorm();const d=CI.dr;if(!d.date){say('경기 날짜를 골라 주세요.');return}
     S.sched.games=S.sched.games.filter(g=>g.date>=today());const nid='e'+d.date.replace(/-/g,'')+Math.random().toString(36).slice(2,6);if(S.evId==='w'+d.date)S.evId=nid;S.sched.games.push({id:nid,date:d.date,from:d.from,to:d.to,mode:d.mode,opp:d.opp.trim(),place:d.place});
-    CI.dr=null;ciRe();say(`${d.date} ${d.from} 경기를 추가했어요. 화면 위 경기 선택에서 고를 수 있어요.`);return}
-  const w=e.target.closest('[data-dow]');if(w){ciNorm();const i=w.dataset.dow;if(S.sched.weekly[i])delete S.sched.weekly[i];else S.sched.weekly[i]={from:'05:00',to:'11:00'};ciRe();return}
+    CI.dr=null;ciRe();say(`${d.date} ${d.from} 경기를 추가했어요. 맨 위 경기 선택에서 고를 수 있어요.`);return}
+  const w=e.target.closest('[data-dow]');if(w){ciNorm();const i=w.dataset.dow;if(S.sched.weekly[i])delete S.sched.weekly[i];else S.sched.weekly[i]={from:'07:00',to:'10:00'};ciRe();return}
   const g=e.target.closest('[data-gdel]');if(g){ciNorm();S.sched.games=S.sched.games.filter(x=>(x.id||x.date)!==g.dataset.gdel);ciRe();say('경기를 지웠어요.')}
 });
 document.addEventListener('change',e=>{
