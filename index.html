@@ -477,7 +477,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 let sel=null,resetArm=false,uid=Date.now();
 let S=null;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}try{syPush()}catch(e){}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}try{if(!SY.applying)localStorage.setItem('bz-dirty','1')}catch(e){}try{syPush()}catch(e){}};
 const P=id=>S.players.find(p=>p.id===id);
 const isGK=p=>p.pos.includes('GK');
 function score(p,s){
@@ -1154,6 +1154,7 @@ $('resetBtn').addEventListener('click',e=>{
 norm();if(S.date<today()&&!S.q.some((q,i)=>counted(i)))S.date=today();
 /* ---- 서버 저장 (Firebase Firestore, 무료 요금제) ---- */
 const FBV='13.4.0';
+const DEF_CFG={"apiKey":"AIzaSyDvJZfjmVWOMXzNAgYciQC80qDx8n3iP6E","authDomain":"benchzero-50f14.firebaseapp.com","projectId":"benchzero-50f14","storageBucket":"benchzero-50f14.firebasestorage.app","messagingSenderId":"279178405228","appId":"1:279178405228:web:11cefb680a5a1c85837f49"};
 let SY={cfg:null,club:'',ref:null,F:null,unsub:null,status:'off',err:'',last:0,when:0,applying:false,timer:0};
 const DEV=(()=>{try{let d=localStorage.getItem('jogi-dev');if(!d){d='d'+Math.random().toString(36).slice(2,10);localStorage.setItem('jogi-dev',d)}return d}catch(e){return 'd'+Math.random().toString(36).slice(2,10)}})();
 function syLoad(){try{const o=JSON.parse(localStorage.getItem('jogi-sync')||'null');if(o&&o.cfg&&o.club){SY.cfg=o.cfg;SY.club=o.club}}catch(e){}}
@@ -1174,11 +1175,11 @@ function applyRemote(json){
   SY.applying=true;try{render();setView(S.vt)}finally{SY.applying=false}
 }
 function syPush(now){
-  if(!SY.ref||SY.applying)return;
+  if(!SY.ref||SY.applying||!SY.ready)return;
   clearTimeout(SY.timer);
   SY.timer=setTimeout(()=>{
     const ts=Date.now();SY.last=ts;SY.status='saving';renderSync();
-    SY.F.setDoc(SY.ref,{json:JSON.stringify(shared()),ts,by:DEV}).then(()=>{if(SY.last===ts){SY.status='ok';SY.when=ts;renderSync()}})
+    SY.F.setDoc(SY.ref,{json:JSON.stringify(shared()),ts,by:DEV}).then(()=>{if(SY.last===ts){try{localStorage.setItem('bz-lp',String(ts));localStorage.removeItem('bz-dirty')}catch(e){}SY.status='ok';SY.when=ts;renderSync()}})
       .catch(err=>{SY.status='err';SY.err=err&&err.code||String(err);renderSync()});
   },now?0:1200);
 }
@@ -1194,8 +1195,18 @@ async function syStart(){
     const app=A.getApps().find(a=>a.name===name)||A.initializeApp(SY.cfg,name);
     let db;try{db=F.initializeFirestore(app,{localCache:F.persistentLocalCache({tabManager:F.persistentMultipleTabManager()})})}catch(e){db=F.getFirestore(app)}
     SY.F=F;SY.db=db;SY.ref=F.doc(db,'clubs',SY.club);ciTick();
-    SY.unsub=F.onSnapshot(SY.ref,snap=>{
-      if(!snap.exists()){syPush(true);return}
+    SY.ready=false;
+    SY.unsub=F.onSnapshot(SY.ref,{includeMetadataChanges:true},snap=>{
+      if(!SY.ready){
+        if(snap.metadata.fromCache)return;
+        SY.ready=true;
+        if(!snap.exists()){syPush(true);return}
+        const d0=snap.data()||{};let lp=0,dirty=false;try{lp=+localStorage.getItem('bz-lp')||0;dirty=localStorage.getItem('bz-dirty')==='1'}catch(e){}
+        SY.last=d0.ts;
+        if(dirty&&lp&&d0.ts<=lp){syPush(true);return}
+        applyRemote(d0.json);try{localStorage.removeItem('bz-dirty')}catch(e){}SY.status='ok';SY.when=d0.ts;renderSync();return;
+      }
+      if(!snap.exists())return;
       const d=snap.data()||{};
       if(d.by===DEV&&d.ts<=SY.last){if(!snap.metadata.hasPendingWrites){SY.status='ok';SY.when=d.ts;renderSync()}return}
       if(d.ts>SY.last||d.by!==DEV){SY.last=d.ts;applyRemote(d.json);SY.status='ok';SY.when=d.ts;renderSync()}
@@ -1234,7 +1245,7 @@ function ciApply(docs){
   CI.count=docs.length;
   if(add.length){render();say(`체크인 도착: ${add.join(', ')}`)}else renderCi();
 }
-function ciLink(){const code=btoa(unescape(encodeURIComponent(JSON.stringify({cfg:SY.cfg,code:S.ci.code})))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');return location.origin+location.pathname.replace(/[^/]*$/,'')+'checkin.html#c='+code}
+function ciLink(){const code=btoa(unescape(encodeURIComponent(JSON.stringify({cfg:SY.cfg,code:S.ci.code})))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');return location.origin+location.pathname.replace(/[^/]*$/,'')+'checkin.html#'+(SY.cfg.projectId===DEF_CFG.projectId?S.ci.code:'c='+code)}
 function ciQR(url){
   const box=$('ciQr');if(!box)return;
   const draw=()=>{try{const q=qrcode(0,'M');q.addData(url);q.make();box.innerHTML=q.createSvgTag({cellSize:4,margin:2,scalable:true})}catch(e){box.textContent='QR을 만들지 못했어요'}};
@@ -1246,7 +1257,7 @@ function renderCi(){
   const box=$('ciBox');if(!box)return;ciNorm();const c=S.ci;
   if(!SY.ref){box.innerHTML='<p class="hint">서버에 연결하면 쓸 수 있어요.</p>';return}
   if(!c.code||!c.on){box.innerHTML=`<div class="cibox"><p class="hint">회원이 운동장에 도착해서 자기 휴대폰으로 <b>도착</b> 버튼을 누르면, 도착 순서대로 여기 출석이 자동으로 찍혀요. 로그인은 필요 없어요.</p><div class="btns"><button class="pri" data-ci="on">회원 체크인 켜기</button></div></div>`;return}
-  const H=[];for(let h=3;h<=14;h++)for(const m of['00','30'])H.push(String(h).padStart(2,'0')+':'+m);
+  const H=[];for(let h=0;h<=23;h++)for(const m of['00','30'])H.push(String(h).padStart(2,'0')+':'+m);H.push('23:59');
   const opt=(v)=>H.map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join('');
   const bound=CI.binds.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'ko'));
   const url=ciLink();
@@ -1323,7 +1334,7 @@ function renderSync(){
 }
 function syFromHash(){
   const m=location.hash.match(/^#sync=(.+)$/);if(!m)return false;
-  try{const o=JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g,'+').replace(/_/g,'/')))));if(o.cfg&&o.club){SY.cfg=o.cfg;SY.club=o.club;syKeep()}}catch(e){}
+  if(/^club-[a-z0-9]+$/.test(m[1])){SY.cfg=DEF_CFG;SY.club=m[1];syKeep()}else try{const o=JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g,'+').replace(/_/g,'/')))));if(o.cfg&&o.club){SY.cfg=o.cfg;SY.club=o.club;syKeep()}}catch(e){}
   try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
   return true;
 }
@@ -1335,7 +1346,7 @@ $('syConnect').addEventListener('click',()=>{
 });
 $('syLink').addEventListener('click',()=>{
   const code=btoa(unescape(encodeURIComponent(JSON.stringify({cfg:SY.cfg,club:SY.club})))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-  const url=location.origin+location.pathname+'#sync='+code;
+  const url=location.origin+location.pathname+'#sync='+(SY.cfg.projectId===DEF_CFG.projectId?SY.club:code);
   const box=$('syLinkBox');
   try{navigator.clipboard.writeText(url).then(()=>say('연결 링크를 복사했어요. 운영진 단톡방에 보내 주세요.'),()=>{box.hidden=false;box.value=url;box.select()})}catch(e){box.hidden=false;box.value=url;box.select()}
 });
