@@ -799,7 +799,8 @@ function posPanel(p){
 function renderRoster(){
   $('rsum').textContent=`명단 편집 (전체 ${S.players.length}명 · 출석 ${S.players.filter(p=>p.here).length}명)`;
   const f=($('rfind').value||'').trim();
-  $('roster').innerHTML=S.players.filter(p=>!f||p.name.includes(f)||p.role.includes(f)).map(p=>`<div class="rrow"><span>${esc(p.name)}${p.role?` <small class="ag">${esc(p.role)}</small>`:''}</span><button class="${p.here?'on':''}" data-here="${p.id}">${p.here?'출석':'불참'}</button><button data-age="${p.id}">${agL(p)}</button><button data-lv="${p.id}">실력 ${LV[p.level]}</button><button class="pzs ${openPos===p.id?'on':''}" data-pp="${p.id}" title="${posTxt(p)}">${posShort(p)} ${openPos===p.id?'▲':'▼'}</button>${openPos===p.id?posPanel(p):''}<button data-del="${p.id}" aria-label="${esc(p.name)} 삭제">삭제</button></div>`).join('');
+  let bound=new Set(),arm='';try{bound=new Set(CI.binds.map(b=>b.id));arm=CI.bindArm}catch(e){}
+  $('roster').innerHTML=S.players.filter(p=>!f||p.name.includes(f)||p.role.includes(f)).map(p=>`<div class="rrow"><span>${esc(p.name)}${p.role?` <small class="ag">${esc(p.role)}</small>`:''}${bound.has(p.id)?' <small class="ag" style="color:#16a34a;font-weight:700">휴대폰 등록됨</small>':''}</span>${bound.has(p.id)?`<button class="on" data-unbind="${p.id}">${arm===p.id?'한 번 더 누르면 해제':'휴대폰 해제'}</button>`:''}<button class="${p.here?'on':''}" data-here="${p.id}">${p.here?'출석':'불참'}</button><button data-age="${p.id}">${agL(p)}</button><button data-lv="${p.id}">실력 ${LV[p.level]}</button><button class="pzs ${openPos===p.id?'on':''}" data-pp="${p.id}" title="${posTxt(p)}">${posShort(p)} ${openPos===p.id?'▲':'▼'}</button>${openPos===p.id?posPanel(p):''}<button data-del="${p.id}" aria-label="${esc(p.name)} 삭제">삭제</button></div>`).join('');
 }
 const kindOf=p=>p.role==='준회원'?'assoc':(!p.role||p.role==='회원'||p.role==='명예회원')?'mem':'staff';
 function renderAtt(){
@@ -1226,7 +1227,7 @@ function ciTick(){
   if(CI.code!==c.code||CI.day!==today()){
     ciUnsub();CI.code=c.code;CI.day=today();
     CI.unIn=F.onSnapshot(F.query(F.collection(db,'pub',c.code,'in'),F.where('date','==',CI.day)),qs=>ciApply(qs.docs.map(d=>Object.assign({id:d.id},d.data()))),()=>{});
-    CI.unBind=F.onSnapshot(F.collection(db,'pub',c.code,'bind'),qs=>{CI.binds=qs.docs.map(d=>Object.assign({id:d.id},d.data()));renderCi()},()=>{});
+    CI.unBind=F.onSnapshot(F.collection(db,'pub',c.code,'bind'),qs=>{CI.binds=qs.docs.map(d=>Object.assign({id:d.id},d.data()));renderCi();renderRoster()},()=>{});
   }
   const pub={title:'벤치제로',on:!!c.on,loc:c.loc||null,radius:+c.radius||300,from:c.from,to:c.to,names:S.players.map(p=>({id:p.id,name:p.name,age:p.age||null}))};
   const k=JSON.stringify(pub);
@@ -1290,7 +1291,7 @@ document.addEventListener('click',e=>{
         err=>{CI.locBusy=false;renderCi();say(err&&err.code===1?'위치 권한을 허용해 주세요.':'위치를 못 찾았어요. 다시 눌러 주세요.')},{enableHighAccuracy:true,timeout:15000})}
     return}
   const u=e.target.closest('[data-unbind]');
-  if(u){const id=u.dataset.unbind;if(CI.bindArm!==id){CI.bindArm=id;renderCi();setTimeout(()=>{if(CI.bindArm===id){CI.bindArm='';renderCi()}},4000);return}
+  if(u){const id=u.dataset.unbind;if(CI.bindArm!==id){CI.bindArm=id;renderCi();renderRoster();setTimeout(()=>{if(CI.bindArm===id){CI.bindArm='';renderCi();renderRoster()}},4000);return}
     CI.bindArm='';SY.F.deleteDoc(SY.F.doc(SY.db,'pub',S.ci.code,'bind',id)).then(()=>say('휴대폰 등록을 해제했어요. 새 휴대폰에서 이름을 다시 고르면 돼요.')).catch(()=>say('해제하지 못했어요. 인터넷 연결을 확인해 주세요.'))}
 });
 document.addEventListener('change',e=>{const t=e.target.closest('[data-cs]');if(!t)return;ciNorm();S.ci[t.dataset.cs]=t.dataset.cs==='radius'?+t.value:t.value;render();ciTick()});
