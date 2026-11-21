@@ -49,6 +49,7 @@ ol li span.t{margin-left:auto;color:var(--mute);font-size:.9rem}
 </main>
 <script type="module">
 const FBV='13.4.0';
+const DEF_CFG={"apiKey":"AIzaSyDvJZfjmVWOMXzNAgYciQC80qDx8n3iP6E","authDomain":"benchzero-50f14.firebaseapp.com","projectId":"benchzero-50f14","storageBucket":"benchzero-50f14.firebasestorage.app","messagingSenderId":"279178405228","appId":"1:279178405228:web:11cefb680a5a1c85837f49"};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
@@ -60,6 +61,8 @@ const store=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(
 const load=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}};
 
 function readConf(){
+  const s=location.hash.match(/^#(ci-[a-z0-9]+)$/);
+  if(s){const o={cfg:DEF_CFG,code:s[1]};store('bz-ci',o);const old=load('bz-ci-code');if(old&&old!==o.code)store('bz-me',null);store('bz-ci-code',o.code);try{history.replaceState(null,'',location.pathname)}catch(e){}}
   const m=location.hash.match(/#c=([^&]+)/);
   if(m){try{const o=JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g,'+').replace(/_/g,'/')))));if(o.cfg&&o.code){store('bz-ci',o);const old=load('bz-ci-code');if(old&&old!==o.code)store('bz-me',null);store('bz-ci-code',o.code)}}catch(e){}
     try{history.replaceState(null,'',location.pathname)}catch(e){}}
