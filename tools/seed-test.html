@@ -26,6 +26,18 @@ function frame(players){
   players.forEach(p=>{const[x,y,w,h]=p.box;g.fillStyle=p.team==='A'?'#1d4ed8':'#dc2626';g.fillRect((x+w*.2)*1280,(y+h*.1)*720,w*.6*1280,h*.55*720);g.fillStyle='#222';g.fillRect((x+w*.25)*1280,(y+h*.65)*720,w*.5*1280,h*.35*720);g.fillStyle='#f2c9a0';g.beginPath();g.arc((x+w/2)*1280,(y+h*.08)*720,w*.22*1280,0,7);g.fill()});
   return c.toDataURL('image/jpeg',.7).split(',')[1];
 }
+// 나 찾기용 선수 사진 흉내(세로 96×160): 조끼 색, 등번호, 피부·머리 색을 사람마다 다르게
+function cropImg(team,i,k){
+  const c=document.createElement('canvas');c.width=96;c.height=160;const g=c.getContext('2d');
+  g.fillStyle=k?'#4d8c57':'#3f7d4c';g.fillRect(0,0,96,160);
+  const skin=['#f2c9a0','#e0ac7e','#c68b5e','#f5d5b5'][i%4],hair=['#1f1a17','#3b2a20','#6b6b6b','#2a2a2a','#8a5a2b'][i%5],shorts=['#111','#f5f5f5','#1e3a8a'][i%3];
+  const vest=team==='A'?'#1d4ed8':'#ea580c',dx=k?3:0;
+  g.fillStyle=skin;g.beginPath();g.arc(48+dx,30,15,0,7);g.fill();g.fillStyle=hair;g.beginPath();g.arc(48+dx,24,15,Math.PI,0);g.fill();
+  g.fillStyle=vest;g.fillRect(28+dx,46,40,46);g.fillStyle=skin;g.fillRect(18+dx,50,10,34);g.fillRect(68+dx,50,10,34);
+  g.fillStyle='#fff';g.font='bold 20px sans-serif';g.textAlign='center';g.fillText(String(i+1),48+dx,76);
+  g.fillStyle=shorts;g.fillRect(30+dx,92,36,20);g.fillStyle=skin;g.fillRect(33+dx,112,11,34);g.fillRect(52+dx,112,11,34);g.fillStyle='#222';g.fillRect(31+dx,146,14,7);g.fillRect(51+dx,146,14,7);
+  return c.toDataURL('image/jpeg',.8).split(',')[1];
+}
 function quarter(date,q,startMs){
   const tracks=[],stats={};
   for(let i=0;i<14;i++){
@@ -71,7 +83,7 @@ function quarter(date,q,startMs){
   }
   return {v:1,date,q,startMs,endMs:startMs+25*6e4,source:'benchzero',video:{yt:q===1?'https://youtu.be/aqz-KE-bpKQ':null,drive:q===2?'https://drive.google.com/':null,offsetSec:0},
     frame:{w:1280,h:720,jpg:frame(tracks)},tracks,stats,
-    team:{A:{lineYm:28.4+q,widthM:41.2,lengthM:33.5,distM:22400},B:{lineYm:31.0-q,widthM:38.7,lengthM:30.1,distM:21800}},
+    team:{A:{lineYm:28.4+q,widthM:41.2,lengthM:33.5,distM:22400,color:'#1d4ed8'},B:{lineYm:31.0-q,widthM:38.7,lengthM:30.1,distM:21800,color:'#ea580c'}},
     pitch:{w:100,h:64,calibrated:true},updatedMs:Date.now()};
 }
 document.getElementById('go').onclick=async()=>{
@@ -82,7 +94,11 @@ document.getElementById('go').onclick=async()=>{
     for(const [d,t0] of days){const n=d==='2026-11-22'?3:2;for(let q=1;q<=n;q++){const a=quarter(d,q,t0+(q-1)*30*6e4);
       // 지난 경기에서는 p5(정대현)도 이미 나 찾기를 마친 것으로
       if(d!=='2026-11-22'){a.tracks[4].pid='p5';a.tracks[4].by='claim';a.tracks[8].pid='p9';a.tracks[8].by='admin'}
-      await F.setDoc(F.doc(db,'pub',CODE,'ana',`${d}_${q}`),a);log(`분석 ${d}_${q} 저장 (첫 장면 ${Math.round(a.frame.jpg.length*3/4/1024)}KB)`)}}
+      // 이번 경기 3쿼터: 강성민(p6)에게 자동 제안, 작전판 자리(pid → 운동장 m)로 후보 정렬 시험
+      if(d==='2026-11-22'&&q===3){a.tracks[5].suggest={pid:'p6',score:0.82};a.board={};a.tracks.slice(0,7).forEach((t,i)=>{const s=a.stats[t.tid];a.board['p'+(i+1)]=[+(s.avg[0]+(rnd()-.5)*8).toFixed(1),+(s.avg[1]+(rnd()-.5)*8).toFixed(1)]})}
+      await F.setDoc(F.doc(db,'pub',CODE,'ana',`${d}_${q}`),a);log(`분석 ${d}_${q} 저장 (첫 장면 ${Math.round(a.frame.jpg.length*3/4/1024)}KB)`);
+      // 선수 확대 사진(나 찾기용): 이번 경기만
+      if(d==='2026-11-22'){for(const [i,t] of a.tracks.entries())await F.setDoc(F.doc(db,'pub',CODE,'ana',`${d}_${q}`,'crop',t.tid),{tid:t.tid,jpgs:[cropImg(t.team,i,0),cropImg(t.team,i,1)],ts:Date.now()});log(`  선수 사진 ${a.tracks.length}명 저장`)}}}
     await F.setDoc(F.doc(db,'pub',CODE,'cam','state'),{rec:true,sinceMs:Date.now()-42*6e4,seg:43,battery:71,tempC:38.5,freeMin:150,upDone:41,upTotal:42,viewStream:true,ts:Date.now()});log('촬영 폰 상태 저장');
     log('끝. 회원 화면에서 정대현(p5)을 골라 보세요.');
   }catch(e){log('오류: '+(e.code||e.message))}
@@ -98,6 +114,12 @@ document.getElementById('chk').onclick=async()=>{
   await t('cam/cmd 읽기',()=>F.getDoc(F.doc(db,'pub',CODE,'cam','cmd')));
   await t('짧은 코드는 막혀야 함(✗가 정상)',()=>F.getDoc(F.doc(db,'pub','short','cam','state')));
   await t('admins 읽기는 로그인 없이 막혀야 함(✗가 정상)',()=>F.getDoc(F.doc(db,'admins','x@example.com')));
+  const mp='pt'+Date.now(),mref=F.doc(db,'pub',CODE,'ana','rulecheck_0','mine',mp);
+  await t('mine 생성',()=>F.setDoc(mref,{tid:'1',ts:F.serverTimestamp(),firstTs:F.serverTimestamp()}));
+  await t('mine 바꾸기(처음 고른 시각 유지)',async()=>{const s=await F.getDoc(mref);await F.setDoc(mref,{tid:'2',ts:F.serverTimestamp(),firstTs:s.data().firstTs})});
+  await t('mine 처음 시각 바꾸기는 막혀야 함(✗가 정상)',()=>F.setDoc(mref,{tid:'3',ts:F.serverTimestamp(),firstTs:F.serverTimestamp()}));
+  await t('mine 지우기는 막혀야 함(✗가 정상)',()=>F.deleteDoc(mref));
+  await t('crop 쓰기',()=>F.setDoc(F.doc(db,'pub',CODE,'ana','rulecheck_0','crop','1'),{tid:'1',jpgs:[],ts:Date.now()}));
   await t('rulecheck 문서 지우기',()=>F.deleteDoc(F.doc(db,'pub',CODE,'ana','rulecheck_0')));
 };
 </script>
