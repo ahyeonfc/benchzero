@@ -143,7 +143,7 @@ const pct=v=>v==null?'-':Math.round(v>1?v:v*100)+'%';
 
 // 상태
 const ST={conf:null,test:false,me:null,P:null,F:null,db:null,auth:null,A:null,user:null,admin:false,linkAdmin:false,
-  ana:[],claims:{},norm:null,rankAge:false,sel:null,tab:'game',rank:'q',cam:null,marks:[],msg:'',mcls:'',q:'',confirm:null,err:'',mine:{},crops:{},cropLd:{},sugNo:{},reFind:{},pick:{},fteam:{},att:{},attSet:{},more:{},prof:{}};
+  ana:[],claims:{},norm:null,rankAge:false,sel:null,tab:'game',rank:'q',cam:null,marks:[],msg:'',mcls:'',q:'',confirm:null,err:'',mine:{},crops:{},cropLd:{},idx:null,loadedDates:new Set(),frameLd:{},allLoaded:false,sdkP:null,sugNo:{},reFind:{},pick:{},fteam:{},att:{},attSet:{},more:{},prof:{}};
 
 // 축구회 코드 읽기: 출석(checkin.html)과 같은 저장 키(bz-ci, bz-me)를 쓴다
 function readConf(){
@@ -171,7 +171,8 @@ const nameOf=pid=>{const n=(ST.P&&ST.P.names||[]).find(x=>x.id===pid);return n?n
 // 분석 문서 도우미
 const docId=a=>a.id;
 const sortedAna=()=>ST.ana.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.q||0)-(b.q||0));
-const dates=()=>[...new Set(sortedAna().map(a=>a.date))].reverse();
+// 경기 날짜 목록(최근 순): 경기 목록(ST.idx)이 있으면 그것으로, 아직이면 받은 문서로
+const dates=()=>ST.idx?[...new Set(ST.idx.map(x=>x.date))].sort().reverse():[...new Set(sortedAna().map(a=>a.date))].reverse();
 function tidsOf(a,pid){return (a.tracks||[]).map(t=>String(t.tid)).filter(tid=>ownerOf(a,tid)===pid)}
 // ---------- 분석 계산 ----------
 const nz=v=>v!=null&&typeof v==='number'&&!isNaN(v);
@@ -274,7 +275,8 @@ function gameHtml(){
   if(!a)return `<div class="card"><h2>아직 분석된 경기가 없어요</h2><p class="hint">촬영한 경기가 분석되면 여기에 쿼터별 영상과 내 기록이 나와요.</p></div>`;
   loadAtt(a.date);
   const D=dates(),qs=sortedAna().filter(x=>x.date===a.date),me=ST.me.pid;
-  const sel=`<select data-date>${D.map(d=>`<option value="${d}" ${d===a.date?'selected':''}>${dLabel(d)} 경기</option>`).join('')}</select>`;
+  const sel=`<select data-date>${D.map(d=>`<option value="${d}" ${d===(ST.loadingDate||a.date)?'selected':''}>${dLabel(d)} 경기</option>`).join('')}</select>`;
+  if(ST.loadingDate)return `<div class="card">${sel}<p class="ld">${dLabel(ST.loadingDate)} 경기 불러오는 중…</p></div>`;
   const qb=`<div class="qs" style="margin-top:.5rem">${qs.map(x=>`<button data-sel="${esc(x.id)}" class="${x.id===a.id?'on':''}">${x.q}쿼터${tidsOf(x,me).length?' ✓':(x.tracks||[]).length?' ?':''}</button>`).join('')}</div>`;
   // 아직 나를 안 찾은 쿼터 수
   const unf=qs.filter(x=>(x.tracks||[]).length&&!tidsOf(x,me).length).length;
@@ -347,7 +349,8 @@ function recommendFor(a){
 }
 function findHtml(a){
   const me=ST.me.pid,tr=a.tracks||[],myT=tidsOf(a,me),P=pitchOf(a);
-  if(!ST.crops[a.id])loadCrops(a.id);
+  // 선수 사진은 나 찾기 칸이 화면에 보일 때 받는다(afterRender 의 관찰). 사진이 없는 선수가 있으면 첫 장면에서 잘라야 하니 그때 첫 장면도
+  if(ST.crops[a.id]&&!(a.frame&&a.frame.jpg)&&tr.some(t=>!ST.crops[a.id][t.tid]))loadFrame(a.id);
   if(!tr.length)return `<p class="hint">이 쿼터는 아직 선수 분석이 안 됐어요.</p>`;
   // 1) 이미 찾음(자동 연결 포함)
   if(myT.length&&!ST.reFind[a.id]){
@@ -379,7 +382,7 @@ function findHtml(a){
     ${bp?`<p class="hint" style="margin:0 0 .4rem">작전판에서 <b>${posWords(viewPt(bp,teamOf(a,(tr.find(t=>t.pid===me)||{}).tid),P),P)}</b> 자리였어요. 가까운 선수부터 보여요.</p>`:pf&&pf.zone?`<p class="hint" style="margin:0 0 .4rem">평소 <b>${posWords([pf.zone[0]*P.w,(1-pf.zone[1])*P.h],P)}</b>에서 뛰어서 그 근처 선수부터 보여요.</p>`:''}
     <div class="cands">${show.map(t=>`<button data-cand="${esc(t.tid)}" style="border-color:${teamColor(a,t.team)}" aria-label="${t.team||''}팀 선수">${cropHtml(a,t.tid)}</button>`).join('')||'<p class="hint">고를 수 있는 선수가 없어요.</p>'}</div>
     ${show.length<C.length?`<button data-act="more" style="width:100%;margin-top:.4rem">더 보기 (${C.length-show.length}명)</button>`:''}
-    <details class="axh" style="margin-top:.5rem"><summary>전체 장면에서 보기</summary>${frameHtml(a)}</details>`;
+    <details class="axh" data-frame style="margin-top:.5rem"><summary>전체 장면에서 보기</summary>${frameHtml(a)}</details>`;
 }
 // 습관 식별 정보: 분석기가 준 tracks[].idf, 없으면 stats 로 대신 만든다(키는 없음)
 function idfOf(a,t){
@@ -389,6 +392,7 @@ function idfOf(a,t){
 }
 // 습관 프로필 갱신: 경기 날 하루에 한 번(그날 첫 확정)만, 새 값 = 이전 + (이번 - 이전) / min(n+1, 8)
 async function updateProf(a,tid){
+  await ST.sdkP;   // 쓰기는 Firebase 라이브러리가 준비된 뒤
   const t=(a.tracks||[]).find(x=>String(x.tid)===String(tid));if(!t)return;const v=idfOf(a,t);if(!v)return;
   const F=ST.F,me=ST.me.pid,ref=F.doc(ST.db,'pub',ST.conf.code,'prof',me);
   try{const ex=await F.getDoc(ref),o=ex.exists()?ex.data():{n:0,days:[]};const days=o.days||[];if(days.includes(a.date))return;
@@ -401,12 +405,13 @@ async function updateProf(a,tid){
 }
 // 전체 장면(보기 전용): 내 네모는 노란색
 function frameHtml(a){
-  const f=a.frame;if(!f||!f.jpg)return '<p class="hint">첫 장면이 없어요.</p>';
+  const f=a.frame;if(!f)return '<p class="hint">첫 장면이 없어요.</p>';if(!f.jpg)return '<p class="ld">첫 장면 불러오는 중…</p>';
   const mine=new Set(tidsOf(a,ST.me.pid)),src=f.jpg.startsWith('data:')?f.jpg:'data:image/jpeg;base64,'+f.jpg;
   return `<div class="frame" style="aspect-ratio:${f.w||16}/${f.h||9}"><img src="${src}" alt="${a.q}쿼터 첫 장면">${(a.tracks||[]).map(t=>{const[x,y,w,h]=t.box||[0,0,0,0];return `<i class="bx ${t.team||''} ${mine.has(String(t.tid))?'me':''}" style="left:${x*100}%;top:${y*100}%;width:${w*100}%;height:${h*100}%"></i>`}).join('')}</div>`;
 }
 // 내가 고른 선수 저장: mine/{내 pid} = {tid, ts, firstTs}. 처음 고른 시각(firstTs)에서 MINE_HOURS 안에는 바꿀 수 있다
 async function saveMine(a,tid){
+  await ST.sdkP;   // 쓰기는 Firebase 라이브러리가 준비된 뒤
   const me=ST.me.pid,o=ownerOf(a,tid);if(o&&o!==me){say(`${nameOf(o)} 님으로 정해진 선수예요.`,'bad');return}
   const F=ST.F,ref=F.doc(ST.db,'pub',ST.conf.code,'ana',a.id,'mine',me);
   try{const ex=await F.getDoc(ref);const now=F.serverTimestamp();
@@ -416,12 +421,12 @@ async function saveMine(a,tid){
 }
 async function loadCrops(id){
   if(ST.cropLd[id])return;ST.cropLd[id]=1;
-  try{const F=ST.F,qs=await F.getDocs(F.collection(ST.db,'pub',ST.conf.code,'ana',id,'crop'));const m={};qs.forEach(d=>{m[d.id]=d.data()});ST.crops[id]=m;render()}catch(e){ST.crops[id]={}}
+  try{const L=await restQuery(`${P_CODE()}/ana/${encodeURIComponent(id)}`,{from:[{collectionId:'crop'}]});const m={};L.forEach(d=>{m[d.id]=d});ST.crops[id]=m;render()}catch(e){ST.crops[id]={}}
 }
 // 그날 출석한 사람 수(출석 체크 기록). 시험 코드에는 없어서 0 → 제한 없음
 async function loadAtt(date){
   if(ST.att[date]!=null)return;ST.att[date]=0;
-  try{const F=ST.F,qs=await F.getDocs(F.query(F.collection(ST.db,'pub',ST.conf.code,'in'),F.where('date','==',date)));const S=new Set(qs.docs.map(d=>d.data().pid));ST.att[date]=S.size;ST.attSet[date]=S;render()}catch(e){}
+  try{const L=await restQuery(P_CODE(),{from:[{collectionId:'in'}],select:{fields:fld(['pid'])},where:eqDate(date)});const S=new Set(L.map(d=>d.pid));ST.att[date]=S.size;ST.attSet[date]=S;render()}catch(e){}
 }
 // ---------- 경기 리포트 (쿼터 하나 또는 그날 합계) ----------
 // 카메라 영상으로 잰 순간 값(최고 속도, 가속·감속)은 오차가 있을 수 있어 "참고" 표시를 붙인다
@@ -840,6 +845,8 @@ function loadHtml(D){
 }
 // 내 카드 탭: 선수 카드(최근 1개월), 시즌 누적·개인 최고, 시즌 추이, 배지, 부하 관리
 function mineHtml(){
+  // 내 카드는 최근 1개월·시즌 추이가 필요해서 이 탭을 처음 열 때 나머지 경기를 받는다
+  if(!ST.allLoaded){loadAllDates();return `<div class="card"><p class="ld">내 기록 불러오는 중…</p></div>`}
   const D=dayStats(ST.me.pid);
   if(!D.length)return `<div class="card"><h2>${esc(ST.me.name)} 님 선수 카드</h2><p class="hint">아직 내 기록이 없어요. 경기 탭에서 <b>나 찾기</b>를 하면 기록이 쌓여요.</p></div>`;
   const s=mergeStats(D.map(d=>d.s)),nq=D.reduce((t,d)=>t+d.q,0);
@@ -904,6 +911,7 @@ function normAdminHtml(){
     <p class="hint">적용하면 모든 회원 카드가 이 기준으로 바뀌어요. 구글 로그인한 운영진만 적용할 수 있어요.${ST.norm?' 지금은 운영진이 적용한 기준을 쓰고 있어요.':''}</p></div>`;
 }
 async function saveNorm(norm){
+  await ST.sdkP;   // 쓰기는 Firebase 라이브러리가 준비된 뒤
   if(!ST.user||!ST.admin){say('구글 로그인한 운영진만 적용할 수 있어요.','bad');return}
   try{const F=ST.F;await F.setDoc(F.doc(ST.db,'pub',ST.conf.code,'conf','norm'),{norm,upd:Date.now(),by:ST.user.email});say(norm?'새 기준을 적용했어요.':'처음 기준으로 되돌렸어요.','ok')}catch(e){say('저장하지 못했어요.','bad')}
 }
@@ -927,12 +935,17 @@ function adminHtml(){
     <div class="row"><button data-act="oldAdmin">로테이션·작전판 관리 화면</button>${ST.user?'<button data-act="logout">로그아웃</button>':'<button data-act="login">구글 로그인</button>'}</div></div>`;
 }
 function afterRender(){
+  // 나 찾기 칸이 화면에 들어오면 그 쿼터 선수 사진을 받는다
+  const fc=$('findCard'),ca=curAna();if(ST.cropObs)ST.cropObs.disconnect();
+  if(fc&&ca&&!ST.crops[ca.id]&&'IntersectionObserver' in window){ST.cropObs=new IntersectionObserver(es=>{if(es.some(x=>x.isIntersecting)){ST.cropObs.disconnect();loadCrops(ca.id)}},{rootMargin:'200px'});ST.cropObs.observe(fc)}
+  else if(fc&&ca&&!ST.crops[ca.id])loadCrops(ca.id);
   document.querySelectorAll('canvas.pitch').forEach(drawPitch);
   const q=$('camQr');if(q&&window.qrcode){try{const g=qrcode(0,'M');g.addData(`matchcam://link?code=${encodeURIComponent(ST.conf.code)}`);g.make();q.innerHTML=g.createSvgTag({cellSize:4,margin:2,scalable:true})}catch(e){q.textContent='QR을 만들지 못했어요'}}
 }
 
 // ---------- 동작 ----------
 async function bind(){
+  await ST.sdkP;   // 쓰기는 Firebase 라이브러리가 준비된 뒤
   const n=ST.confirm,F=ST.F,ref=F.doc(ST.db,'pub',ST.conf.code,'bind',n.id);
   try{
     const s=await F.getDoc(ref);
@@ -942,15 +955,18 @@ async function bind(){
   }catch(e){ST.confirm=null;ST.me=null;say('등록하지 못했어요. 인터넷 연결을 확인해 주세요.','bad')}
 }
 async function camCmd(op){
+  await ST.sdkP;   // 쓰기는 Firebase 라이브러리가 준비된 뒤
   const F=ST.F;try{await F.setDoc(F.doc(ST.db,'pub',ST.conf.code,'cam','cmd'),{op,q:null,ts:Date.now()});say(op==='start'?'녹화 시작을 보냈어요.':'녹화 정지를 보냈어요.','ok')}catch(e){say('보내지 못했어요.','bad')}
 }
 async function addMark(){
+  await ST.sdkP;   // 쓰기는 Firebase 라이브러리가 준비된 뒤
   const t=($('markTxt')||{}).value||'';const F=ST.F,a=curAna(),now=Date.now();
   // 지금 진행 중인 쿼터: 오늘 분석 문서 중 시작 시각이 지난 마지막 것(없으면 비움)
   const live=sortedAna().filter(x=>x.startMs&&x.startMs<=now&&(!x.endMs||x.endMs>=now-5*6e4)).pop();
   try{await F.setDoc(F.doc(ST.db,'pub',ST.conf.code,'cam','marks'),{list:F.arrayUnion({ts:now,q:live?live.q:null,text:t.trim()||'장면',by:ST.user?ST.user.email:DEV})},{merge:true});say(`${hm(now)} 장면을 표시했어요.`,'ok')}catch(e){say('표시하지 못했어요.','bad')}
 }
 async function saveYt(){
+  await ST.sdkP;   // 쓰기는 Firebase 라이브러리가 준비된 뒤
   const F=ST.F;let n=0;
   for(const el of document.querySelectorAll('[data-yt]')){const a=ST.ana.find(x=>x.id===el.dataset.yt);const v=el.value.trim();if(!a||v===((a.video&&a.video.yt)||''))continue;
     if(v&&!ytId(v)){say(`${a.q}쿼터 링크가 유튜브 주소가 아니에요.`,'bad');return}
@@ -958,6 +974,7 @@ async function saveYt(){
   say(n?`영상 링크 ${n}개를 저장했어요.`:'바뀐 링크가 없어요.','ok');
 }
 async function savePid(){
+  await ST.sdkP;   // 쓰기는 Firebase 라이브러리가 준비된 뒤
   const a=curAna();if(!a)return;const F=ST.F,ref=F.doc(ST.db,'pub',ST.conf.code,'ana',a.id);
   try{
     // 저장 직전 최신 문서를 다시 읽어 tracks 만 고친다(분석기가 그사이 바꾼 값을 덮지 않게)
@@ -1006,52 +1023,108 @@ document.addEventListener('click',e=>{
     else if(k==='more'){ST.more[a.id]=true;render()}else saveMine(a,ac.dataset.t)}
   else if(k==='goFind'){ST.tab='game';ST.sel=ac.dataset.t;ST.gview='q';render();const c=document.getElementById('findCard');if(c)c.scrollIntoView({block:'start'})}
   else if(k==='banOff'){let off=[];try{off=JSON.parse(localStorage.getItem('bz-banoff')||'[]')}catch(e){}off=[...off,ac.dataset.t].slice(-60);try{localStorage.setItem('bz-banoff',JSON.stringify(off))}catch(e){}render()}
-  else if(k==='normOpen'){ST.normOpen=true;render()}else if(k==='normClose'){ST.normOpen=false;render()}
+  else if(k==='normOpen'){say('최근 기록을 불러오는 중이에요…');loadAllDates().then(()=>{ST.normOpen=true;ST.msg='';render()})}else if(k==='normClose'){ST.normOpen=false;render()}
   else if(k==='normApply'){if(ST.normProp)saveNorm(ST.normProp)}else if(k==='normReset')saveNorm(null);
   else if(k==='login')login();else if(k==='logout'){ST.A&&ST.A.signOut(ST.auth)}
   else if(k==='oldAdmin'){try{sessionStorage.setItem('bz-admin','1')}catch(err){}location.href='index.html'}
   else if(k==='mark')addMark();else if(k==='saveYt')saveYt();else if(k==='savePid')savePid();
 });
-document.addEventListener('change',e=>{const md=e.target.closest('[data-mday]');if(md){ST.mday=md.value;render();return}const d=e.target.closest('[data-date]');if(d){const L=sortedAna().filter(x=>x.date===d.value);if(L.length)ST.sel=L[0].id;render()}});
+// "전체 장면에서 보기"를 열면 첫 장면 사진을 받는다
+document.addEventListener('toggle',e=>{const d=e.target;if(d.matches&&d.matches('details[data-frame]')&&d.open){const a=curAna();if(a)loadFrame(a.id)}},true);
+document.addEventListener('change',e=>{const md=e.target.closest('[data-mday]');if(md){ST.mday=md.value;render();return}const d=e.target.closest('[data-date]');if(d){const v=d.value,go=()=>{const L=sortedAna().filter(x=>x.date===v);if(L.length)ST.sel=L[0].id;ST.loadingDate=null;render()};
+  // 다른 경기를 고르면 그 경기만 그때 받는다
+  if(ST.loadedDates.has(v))go();else{ST.loadingDate=v;render();loadDates([v]).then(go).catch(()=>{ST.loadingDate=null;say('불러오지 못했어요.','bad')})}}});
 
-// ---------- 불러오기 ----------
-async function loadClaims(id){
-  // 옛 방식 claim/{tid} 와 새 방식 mine/{pid}(같은 날 바꿀 수 있음)를 함께 읽는다
-  try{const F=ST.F,base=['pub',ST.conf.code,'ana',id];const [qc,qm]=await Promise.all([F.getDocs(F.collection(ST.db,...base,'claim')),F.getDocs(F.collection(ST.db,...base,'mine')).catch(()=>null)]);
-    const m={};qc.forEach(d=>m[d.id]=d.data());ST.claims[id]=m;const mm={};if(qm)qm.forEach(d=>mm[d.id]=d.data());ST.mine[id]=mm;render()}catch(e){}
+// ---------- 빠른 불러오기: Firestore REST(필요한 칸만) ----------
+// 첫 화면은 Firebase 라이브러리(압축 전 약 1MB)를 기다리지 않고 REST 로 바로 읽는다. 쿼리에서 칸을 골라 첫 장면 사진(frame.jpg)은 받지 않는다.
+// 라이브러리는 화면을 띄운 뒤 뒤에서 받아 쓰기·로그인·실시간에만 쓴다(ST.sdkP)
+const RB=()=>`https://firestore.googleapis.com/v1/projects/${ST.conf.cfg.projectId}/databases/(default)/documents`;
+function fsVal(v){if(!v)return null;if('nullValue' in v)return null;if('stringValue' in v)return v.stringValue;if('integerValue' in v)return +v.integerValue;if('doubleValue' in v)return v.doubleValue;
+  if('booleanValue' in v)return v.booleanValue;if('timestampValue' in v){const ms=Date.parse(v.timestampValue);return {toMillis:()=>ms}}
+  if('arrayValue' in v)return (v.arrayValue.values||[]).map(fsVal);if('mapValue' in v)return fsMap(v.mapValue.fields||{});return null}
+function fsMap(f){const o={};for(const k in f)o[k]=fsVal(f[k]);return o}
+const fsDoc=d=>Object.assign({id:decodeURIComponent(d.name.split('/').pop())},fsMap(d.fields||{}));
+async function restGet(path,mask){
+  const u=`${RB()}/${path}?key=${ST.conf.cfg.apiKey}${(mask||[]).map(m=>'&mask.fieldPaths='+encodeURIComponent(m)).join('')}`;
+  const r=await fetch(u);if(r.status===404)return null;if(!r.ok)throw new Error('rest '+r.status);const j=await r.json();return fsDoc(j)}
+async function restQuery(parent,sq){
+  const r=await fetch(`${RB()}${parent?'/'+parent:''}:runQuery?key=${ST.conf.cfg.apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({structuredQuery:sq})});
+  if(!r.ok)throw new Error('rest '+r.status);const j=await r.json();return j.filter(x=>x.document).map(x=>fsDoc(x.document))}
+const fld=a=>a.map(f=>({fieldPath:f}));
+const eqDate=d=>({fieldFilter:{field:{fieldPath:'date'},op:'EQUAL',value:{stringValue:d}}});
+// 분석 문서에서 받는 칸(첫 장면 사진 frame.jpg 는 빼고 크기만)
+const ANA_LIGHT=['v','date','q','startMs','endMs','source','video','tracks','stats','team','pitch','board','lineup','updatedMs','frame.w','frame.h'];
+const P_CODE=()=>`pub/${ST.conf.code}`;
+// 경기 목록: 날짜·쿼터 번호·시작 시각만
+async function loadIndex(){
+  const L=await restQuery(P_CODE(),{from:[{collectionId:'ana'}],select:{fields:fld(['date','q','startMs','updatedMs'])},orderBy:[{field:{fieldPath:'startMs'},direction:'DESCENDING'}],limit:300});
+  ST.idx=L.filter(x=>x.date).map(x=>({id:x.id,date:x.date,q:x.q,startMs:x.startMs,updatedMs:x.updatedMs}));return ST.idx;
+}
+// 날짜별 상세(사진 빼고). 이미 받은 날짜는 다시 받지 않는다(force 면 다시)
+async function loadDates(ds,force){
+  ds=[...new Set(ds)].filter(d=>force||!ST.loadedDates.has(d));if(!ds.length)return;
+  const R=await Promise.all(ds.map(d=>restQuery(P_CODE(),{from:[{collectionId:'ana'}],select:{fields:fld(ANA_LIGHT)},where:eqDate(d)})));
+  const m=new Map(ST.ana.map(a=>[a.id,a]));R.flat().forEach(a=>{const o=m.get(a.id);if(o&&o.frame&&o.frame.jpg&&a.frame)a.frame.jpg=o.frame.jpg;m.set(a.id,a)});
+  ST.ana=[...m.values()];ds.forEach(d=>ST.loadedDates.add(d));
+  await Promise.all(R.flat().map(a=>loadClaims(a.id,true)));
+}
+// 내 카드(최근 1개월·시즌 추이)에 필요한 날짜를 모두. 한 번만
+async function loadAllDates(){if(ST.allP)return ST.allP;ST.allP=loadDates((ST.idx||[]).map(x=>x.date)).then(()=>{ST.allLoaded=true;render()});return ST.allP}
+// 첫 장면 사진: "전체 장면에서 보기"를 열거나 선수 사진(crop)이 없어서 첫 장면에서 잘라야 할 때만
+async function loadFrame(id){
+  if(ST.frameLd[id])return;ST.frameLd[id]=1;
+  try{const d=await restGet(`${P_CODE()}/ana/${encodeURIComponent(id)}`,['frame']);const a=ST.ana.find(x=>x.id===id);if(a&&d&&d.frame){a.frame=Object.assign({},a.frame,d.frame);render()}}catch(e){ST.frameLd[id]=0}
+}
+// 새 쿼터·고친 분석 확인: 1분마다 목록만 다시 받아(화면이 보일 때만), 새로 생기거나 updatedMs 가 바뀐 문서의 날짜만 다시 받는다
+async function pollIndex(){
+  if(document.hidden||!ST.conf||!ST.idx)return;
+  try{const old=new Set(ST.idx.map(x=>x.id)),L=await loadIndex(),ch=L.filter(x=>{if(!old.has(x.id))return true;const a=ST.ana.find(y=>y.id===x.id);return a&&x.updatedMs&&a.updatedMs!==x.updatedMs});
+    const ds=ch.map(x=>x.date).filter(d=>ST.loadedDates.has(d)||d===L[0].date);if(ds.length){await loadDates(ds,true);render()}}catch(e){}
+}
+// 옛 방식 claim/{tid} 와 새 방식 mine/{pid}(같은 날 바꿀 수 있음)를 함께 읽는다(REST)
+async function loadClaims(id,quiet){
+  try{const par=`${P_CODE()}/ana/${encodeURIComponent(id)}`;const [qc,qm]=await Promise.all([restQuery(par,{from:[{collectionId:'claim'}]}),restQuery(par,{from:[{collectionId:'mine'}]}).catch(()=>[])]);
+    const m={};qc.forEach(d=>{m[d.id]=d});ST.claims[id]=m;const mm={};qm.forEach(d=>{mm[d.id]=d});ST.mine[id]=mm;if(!quiet)render()}catch(e){}
 }
 async function start(){
   ST.conf=readConf();ST.me=loadMe();
   ST.linkAdmin=!!load('jogi-sync');   // 기존 연결 링크(축구회 코드)로 연결된 운영진 휴대폰
   // 예전 운영진 주소(member.html?admin)로 들어오면 메뉴를 한 번 열어 둔다(안내에는 쓰지 않음)
   ST.menuOpen=/[?&]admin(=|&|$)/.test(location.search);
-  render();if(!ST.conf)return initAuth(null);
+  render();if(!ST.conf){ST.sdkP=loadSdk(DEF_CFG);return}
+  // 1) 첫 화면: 명단, 경기 목록, 가장 최근 경기 상세(사진 빼고)를 REST 로 한꺼번에
+  try{
+    const [P,idx]=await Promise.all([restGet(P_CODE()),loadIndex()]);
+    if(idx.length)await loadDates([idx[0].date]);
+    ST.P=P;if(!ST.P)ST.err='회원 화면이 아직 준비되지 않았어요. 운영자에게 알려 주세요.';
+    ST.tFirst=Math.round(performance.now());render();
+  }catch(e){ST.err='연결하지 못했어요. 인터넷 연결을 확인해 주세요.';render();return}
+  // 2) 화면을 띄운 뒤 뒤에서: 내 습관 프로필, 등록 확인, 점수 기준, 새 쿼터 확인, Firebase 라이브러리(쓰기·로그인용)
+  const code=ST.conf.code;
+  if(ST.me)restGet(`${P_CODE()}/prof/${ST.me.pid}`).then(d=>{if(d){ST.prof[ST.me.pid]=d;render()}}).catch(()=>{});
+  if(ST.me&&!ST.test)restGet(`${P_CODE()}/bind/${ST.me.pid}`).then(d=>{if(!d||d.dev!==DEV){const nm=ST.me.name;ST.me=null;saveMe(null);say(`${nm} 님 등록이 해제됐어요. 이름을 다시 골라 주세요.`,'bad')}}).catch(()=>{});
+  // 운영진이 적용한 나이대별 점수 기준(없으면 코드의 AGE_NORM)
+  restGet(`${P_CODE()}/conf/norm`).then(d=>{ST.norm=(d&&d.norm)||null;render()}).catch(()=>{});
+  setInterval(pollIndex,60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollIndex()});
+  ST.sdkP=loadSdk(ST.conf.cfg);
+}
+// Firebase 라이브러리: 쓰기(나 찾기·등록·관리), 로그인, 촬영 폰 실시간 상태에만 쓴다
+async function loadSdk(cfg){
   try{
     const A=await import(`https://www.gstatic.com/firebasejs/${FBV}/firebase-app.js`);
     const F=await import(`https://www.gstatic.com/firebasejs/${FBV}/firebase-firestore.js`);
-    const app=A.getApps().find(a=>a.name==='bz-m')||A.initializeApp(ST.conf.cfg,'bz-m');
-    ST.F=F;ST.db=F.getFirestore(app);const code=ST.conf.code;
-    initAuth(app);
-    F.onSnapshot(F.doc(ST.db,'pub',code),s=>{ST.P=s.exists()?s.data():null;if(!ST.P)ST.err='회원 화면이 아직 준비되지 않았어요. 운영자에게 알려 주세요.';render()},()=>{ST.err='연결하지 못했어요. 인터넷 연결을 확인해 주세요.';render()});
-    // 내 습관 프로필(나 찾기 후보 정렬용)
-    if(ST.me)F.getDoc(F.doc(ST.db,'pub',code,'prof',ST.me.pid)).then(s=>{if(s.exists()){ST.prof[ST.me.pid]=s.data();render()}}).catch(()=>{});
-    if(ST.me&&!ST.test){F.getDoc(F.doc(ST.db,'pub',code,'bind',ST.me.pid)).then(s=>{if(!s.exists()||s.data().dev!==DEV){const nm=ST.me.name;ST.me=null;saveMe(null);say(`${nm} 님 등록이 해제됐어요. 이름을 다시 골라 주세요.`,'bad')}}).catch(()=>{})}
-    // 분석 문서: 최근 것부터 60개(첫 장면 사진이 들어 있어 많이 받지 않는다)
-    F.onSnapshot(F.query(F.collection(ST.db,'pub',code,'ana'),F.orderBy('startMs','desc'),F.limit(60)),qs=>{
-      const old=new Set(ST.ana.map(a=>a.id));ST.ana=qs.docs.map(d=>Object.assign({id:d.id},d.data()));
-      ST.ana.forEach(a=>{if(!old.has(a.id)||!ST.claims[a.id])loadClaims(a.id)});render()},()=>{});
-    F.onSnapshot(F.doc(ST.db,'pub',code,'cam','state'),s=>{ST.cam=s.exists()?s.data():null;if(ST.tab==='admin')render()},()=>{});
-    // 운영진이 적용한 나이대별 점수 기준(없으면 코드의 AGE_NORM)
-    F.onSnapshot(F.doc(ST.db,'pub',code,'conf','norm'),s=>{ST.norm=(s.exists()&&s.data().norm)||null;render()},()=>{});
-    F.onSnapshot(F.doc(ST.db,'pub',code,'cam','marks'),s=>{ST.marks=(s.exists()&&s.data().list)||[];if(ST.tab==='admin')render()},()=>{});
-    setInterval(()=>{if(ST.tab==='admin')render()},30000);
-  }catch(e){ST.err='연결하지 못했어요. 인터넷 연결을 확인해 주세요.';render()}
+    const app=A.getApps().find(a=>a.name==='bz-m')||A.initializeApp(cfg,'bz-m');
+    ST.F=F;ST.db=F.getFirestore(app);initAuth(app);
+    if(ST.conf){const code=ST.conf.code;
+      F.onSnapshot(F.doc(ST.db,'pub',code,'cam','state'),s=>{ST.cam=s.exists()?s.data():null;if(ST.tab==='admin')render()},()=>{});
+      F.onSnapshot(F.doc(ST.db,'pub',code,'cam','marks'),s=>{ST.marks=(s.exists()&&s.data().list)||[];if(ST.tab==='admin')render()},()=>{});
+      setInterval(()=>{if(ST.tab==='admin')render()},30000)}
+    return true;
+  }catch(e){return false}
 }
 async function initAuth(app){
   try{
     const A=await import(`https://www.gstatic.com/firebasejs/${FBV}/firebase-auth.js`);
-    if(!app){const AP=await import(`https://www.gstatic.com/firebasejs/${FBV}/firebase-app.js`);app=AP.getApps().find(a=>a.name==='bz-m')||AP.initializeApp(DEF_CFG,'bz-m');
-      if(!ST.F){ST.F=await import(`https://www.gstatic.com/firebasejs/${FBV}/firebase-firestore.js`);ST.db=ST.F.getFirestore(app)}}
     ST.A=A;ST.auth=A.getAuth(app);
     A.getRedirectResult(ST.auth).catch(()=>{});
     A.onAuthStateChanged(ST.auth,u=>{ST.user=u;checkAdmin()});
