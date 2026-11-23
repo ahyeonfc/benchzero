@@ -45,6 +45,7 @@ textarea{padding:.5rem .8rem}
 .frame .bx.A{border-color:#60a5fa}.frame .bx.B{border-color:#f87171}
 .frame .bx.me{border:3px solid #facc15;box-shadow:0 0 0 2px #0008}
 .frame .bx.tk{border-style:dashed;opacity:.7}
+.frame .bx::after{content:"";position:absolute;inset:-12px -8px}
 .frame .bx span{position:absolute;left:0;bottom:100%;font-size:.65rem;background:#000a;color:#fff;padding:0 .2rem;white-space:nowrap;border-radius:2px}
 .bar{display:flex;height:1.2rem;border-radius:.4rem;overflow:hidden;background:var(--bg)}
 .bar i{display:block}
@@ -53,7 +54,7 @@ canvas{display:block;width:100%;border-radius:.6rem}
 table{width:100%;border-collapse:collapse;font-size:.9rem}
 th,td{padding:.4rem .3rem;border-bottom:1px solid var(--line);text-align:right}
 th:first-child,td:first-child{text-align:left}
-th{color:var(--mute);font-weight:600;font-size:.8rem}
+th{color:var(--mute);font-weight:600;font-size:.8rem;white-space:nowrap}
 tr.me td{font-weight:800;background:light-dark(#eaf7ee,#1a2d22)}
 .up{color:var(--go)}.dn{color:var(--bad)}
 .pill{display:inline-block;padding:.1rem .55rem;border-radius:1rem;font-size:.8rem;font-weight:700;background:var(--bg)}
@@ -109,7 +110,6 @@ function readConf(){
   const S=load('jogi-rotation-v2');if(S&&S.ci&&S.ci.code)return{cfg:DEF_CFG,code:S.ci.code};
   return null;
 }
-const meKey=()=>ST.test?null:'bz-me';
 function loadMe(){if(ST.test){try{return JSON.parse(sessionStorage.getItem('bz-mtest-me')||'null')}catch(e){return null}}return load('bz-me')}
 function saveMe(v){if(ST.test){try{v?sessionStorage.setItem('bz-mtest-me',JSON.stringify(v)):sessionStorage.removeItem('bz-mtest-me')}catch(e){}return}store('bz-me',v)}
 
@@ -211,10 +211,10 @@ function statHtml(a,s){
     <div><b>${pct(s.coverPct)}</b><span>활동 범위</span></div></div>
     <h3>속도 구간별 거리</h3>${zonesHtml(s.zones)}
     <h3>히트맵과 평균 위치</h3><canvas class="pitch" data-ana="${esc(a.id)}" width="600" height="400"></canvas>
-    <div class="leg"><span><i style="background:#facc15"></i>내 평균 위치</span><span><i style="background:#fff"></i>작전판 자리</span></div>
+    <div class="leg"><span><i style="background:#facc15"></i>내 평균 위치</span><span><i style="background:#fff;border:1px solid #888"></i>작전판 자리</span></div>
     <p class="hint">${s.board&&s.devM!=null?`작전판 자리에서 평균 <b>${s.devM.toFixed(1)}m</b> 벗어나 있었어요.`:'작전판 자리가 없어 비교하지 않았어요.'} 왼쪽에서 오른쪽으로 공격하는 방향으로 맞춰 보여요.</p>`;
 }
-function teamHtml(a){const T=a.team||{},ks=Object.keys(T);if(!ks.length)return '';
+function teamHtml(a){const T=a.team||{},ks=Object.keys(T).sort();if(!ks.length)return '';
   return `<div class="card"><h2>팀 모양</h2><table><tr><th>팀</th><th>수비 라인 높이</th><th>폭</th><th>길이</th><th>팀 전체 거리</th></tr>${ks.map(k=>{const t=T[k];return `<tr><td>${esc(k)}팀</td><td>${t.lineYm!=null?t.lineYm.toFixed(1)+'m':'-'}</td><td>${t.widthM!=null?t.widthM.toFixed(1)+'m':'-'}</td><td>${t.lengthM!=null?t.lengthM.toFixed(1)+'m':'-'}</td><td>${km(t.distM)}</td></tr>`}).join('')}</table></div>`}
 function drawPitch(cv){
   const a=ST.ana.find(x=>x.id===cv.dataset.ana);if(!a)return;const s=statOf(a,ST.me.pid);if(!s)return;
@@ -240,7 +240,7 @@ function mineHtml(){
     <div><b>${mins?km(tot/mins*25):'-'}</b><span>25분당 거리</span></div><div><b>${pct(tot?hi/tot:0)}</b><span>고강도 비율</span></div><div><b>${D.reduce((s,d)=>s+d.spr,0)}회</b><span>누적 스프린트</span></div></div></div>`;
   const last=D.slice(-6).reverse();
   const arrow=(v,p)=>p==null?'':v>p*1.03?' <span class="up">▲</span>':v<p*0.97?' <span class="dn">▼</span>':'';
-  const cmp=`<div class="card"><h2>지난 경기 비교</h2><table><tr><th>날짜</th><th>쿼터</th><th>거리</th><th>25분당</th><th>최고 속도</th><th>고강도</th></tr>${last.map((d,i)=>{const p=last[i+1],r=d.mins?d.dist/d.mins*25:0,pr=p&&p.mins?p.dist/p.mins*25:null;return `<tr><td>${dLabel(d.date)}</td><td>${d.q}</td><td>${km(d.dist)}</td><td>${km(r)}${arrow(r,pr)}</td><td>${d.vmax.toFixed(1)}${arrow(d.vmax,p&&p.vmax)}</td><td>${pct(d.dist?d.hi/d.dist:0)}</td></tr>`}).join('')}</table><p class="hint">▲▼는 바로 앞 경기와 비교예요. 쿼터 수가 달라서 <b>25분당 거리</b>로 비교해요.</p></div>`;
+  const cmp=`<div class="card"><h2>지난 경기 비교</h2><table><tr><th>날짜</th><th>Q</th><th>거리</th><th>25분당</th><th>최고km/h</th><th>고강도</th></tr>${last.map((d,i)=>{const p=last[i+1],r=d.mins?d.dist/d.mins*25:0,pr=p&&p.mins?p.dist/p.mins*25:null;return `<tr><td>${dLabel(d.date)}</td><td>${d.q}</td><td>${km(d.dist)}</td><td>${km(r)}${arrow(r,pr)}</td><td>${d.vmax.toFixed(1)}${arrow(d.vmax,p&&p.vmax)}</td><td>${pct(d.dist?d.hi/d.dist:0)}</td></tr>`}).join('')}</table><p class="hint">▲▼는 바로 앞 경기와 비교예요. 쿼터 수가 달라서 <b>25분당 거리</b>로 비교해요.</p></div>`;
   return card+cmp+loadHtml(D);
 }
 function loadHtml(D){
