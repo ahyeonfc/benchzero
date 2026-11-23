@@ -893,10 +893,10 @@ function renderStart(){
 function liveQ(){let live=-1;S.q.forEach((x,i)=>{if(x.started)live=i});return live}
 function endBtn(){const i=liveQ();if(i<0||S.q[i].ended)return '';return `<button class="dark" data-qend="${i}">⏹ ${i+1}쿼터 종료</button>`}
 // 쿼터 시작·종료를 촬영 앱에 알린다: 앱 안 화면이면 MatchCam.event, 서버에는 pub/{코드}/cam/cmd
-function camEvt(type,q,ts){
-  const o={type,q,ts};
+function camEvt(type,q,ts,extra){
+  const o=Object.assign({type,q,ts},extra||{});
   try{if(window.MatchCam&&typeof MatchCam.event==='function')MatchCam.event(JSON.stringify(o))}catch(e){}
-  try{ciNorm();if(SY.F&&SY.db&&S.ci.code)SY.F.setDoc(SY.F.doc(SY.db,'pub',S.ci.code,'cam','cmd'),{op:type,q,ts}).catch(()=>{})}catch(e){}
+  try{ciNorm();if(SY.F&&SY.db&&S.ci.code)SY.F.setDoc(SY.F.doc(SY.db,'pub',S.ci.code,'cam','cmd'),Object.assign({op:type,q,ts},extra||{})).catch(()=>{})}catch(e){}
 }
 function quarterEnd(){const i=liveQ();if(i<0||S.q[i].ended)return;S.q[i].ended=Date.now();camEvt('quarterEnd',i+1,S.q[i].ended);render();say(`${i+1}쿼터 종료(${hm(S.q[i].ended)}) 기록했어요.`)}
 function renderNav(){
@@ -1502,7 +1502,9 @@ function kickoff(){
   if(!filled(q)){say('말판이 비어 있어요. 자동 편성을 누르거나 선수를 먼저 놓아 주세요.');return}
   // [MatchCam 연동] 앞 쿼터를 종료하지 않았으면 지금 시각으로 종료를 먼저 알린다
   {const pi=liveQ();if(pi>=0&&pi!==S.cur&&!S.q[pi].ended){S.q[pi].ended=Date.now();camEvt('quarterEnd',pi+1,S.q[pi].ended)}}
-  q.started=Date.now();q.ended=null;const n=S.cur+1;camEvt('quarterStart',n,q.started);
+  q.started=Date.now();q.ended=null;const n=S.cur+1;
+  // 출전 명단(lineup): 회원 화면 나 찾기 후보 좁히기용(분석기가 ana.lineup 으로 옮김)
+  camEvt('quarterStart',n,q.started,{lineup:[...(q.slots||[]),...(q.b||[])].filter(Boolean)});
   if(S.cur===S.nq-1)S.nq=Math.min(20,S.nq+1);
   if(S.cur<S.nq-1){S.cur++;sel=null;norm();if(!filled(S.q[S.cur]))autoAll()}
   render();

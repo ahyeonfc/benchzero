@@ -109,6 +109,7 @@ details.more{margin-top:.7rem}details.more>summary{cursor:pointer;font-weight:80
 .bigc{display:flex;gap:.4rem;justify-content:center}.bigc img,.bigc .crop{width:31%;max-width:8rem;border-radius:.6rem}
 .dot{display:inline-block;width:.75rem;height:.75rem;border-radius:50%;margin-right:.3rem;vertical-align:-1px;box-shadow:0 0 0 1px #0003}
 .frame i.bx{position:absolute;border:2px solid #fff9;border-radius:3px}.frame i.bx.A{border-color:#60a5fa}.frame i.bx.B{border-color:#f87171}.frame i.bx.me{border:3px solid #facc15}
+.banner{display:flex;align-items:center;gap:.5rem;background:light-dark(#fff7ed,#2a1e12);border:1px solid #f59e0b66;border-radius:.9rem;padding:.5rem .6rem .5rem .9rem;margin-bottom:.8rem;font-size:.92rem}.banner span{flex:1}.banner button{min-height:2.3rem;padding:0 .8rem}.banner .x{border:0;background:transparent;font-size:1.3rem;padding:0 .3rem;color:var(--mute)}
 .axh summary{cursor:pointer;color:var(--mute);font-size:.85rem}
 .seg{display:flex;gap:.3rem;margin-bottom:.6rem}.seg button{flex:1;min-height:2.3rem;font-size:.85rem;padding:0 .3rem}.seg button.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 </style>
@@ -137,7 +138,7 @@ const pct=v=>v==null?'-':Math.round(v>1?v:v*100)+'%';
 
 // 상태
 const ST={conf:null,test:false,me:null,P:null,F:null,db:null,auth:null,A:null,user:null,admin:false,linkAdmin:false,
-  ana:[],claims:{},sel:null,tab:'game',rank:'q',cam:null,marks:[],msg:'',mcls:'',q:'',confirm:null,err:'',mine:{},crops:{},cropLd:{},sugNo:{},reFind:{},pick:{},fteam:{},att:{},more:{}};
+  ana:[],claims:{},sel:null,tab:'game',rank:'q',cam:null,marks:[],msg:'',mcls:'',q:'',confirm:null,err:'',mine:{},crops:{},cropLd:{},sugNo:{},reFind:{},pick:{},fteam:{},att:{},attSet:{},more:{},prof:{}};
 
 // 축구회 코드 읽기: 출석(checkin.html)과 같은 저장 키(bz-ci, bz-me)를 쓴다
 function readConf(){
@@ -219,8 +220,16 @@ function render(){
   if(!ST.me||ST.confirm){$('tabs').innerHTML='';app.innerHTML=pickHtml(m)+adminEntryHtml();bindPick();return}
   $('tabs').innerHTML=tabsHtml();
   if(ST.tab==='admin'&&!(ST.admin||ST.linkAdmin))ST.tab='game';
-  app.innerHTML=m+(ST.tab==='game'?gameHtml():ST.tab==='mine'?mineHtml():ST.tab==='rank'?rankHtml():adminHtml())+(ST.tab!=='admin'?adminEntryHtml():'');
+  app.innerHTML=(ST.tab!=='admin'?bannerHtml():'')+m+(ST.tab==='game'?gameHtml():ST.tab==='mine'?mineHtml():ST.tab==='rank'?rankHtml():adminHtml())+(ST.tab!=='admin'?adminEntryHtml():'');
   afterRender();
+}
+// 새 쿼터 분석 안내 띠: 오늘·어제 경기 중 아직 나를 안 찾은 마지막 쿼터. 출석 기록으로 내가 안 온 날이면 띄우지 않는다
+function bannerHtml(){
+  const L=sortedAna();if(!L.length||!ST.me)return '';const last=L[L.length-1].date;if(last<addDays(todayStr(),-1))return '';
+  let off=[];try{off=JSON.parse(localStorage.getItem('bz-banoff')||'[]')}catch(e){}
+  const un=L.filter(a=>a.date===last&&(a.tracks||[]).length&&!tidsOf(a,ST.me.pid).length&&!off.includes(a.id)&&(()=>{const p=poolOf(a);return !p.size||p.has(ST.me.pid)})());
+  if(!un.length)return '';const a=un[un.length-1];
+  return `<div class="banner"><span><b>${a.q}쿼터 분석이 나왔어요</b> · 나를 찾아 주세요</span><button class="pri" data-act="goFind" data-t="${esc(a.id)}">찾기</button><button class="x" data-act="banOff" data-t="${esc(a.id)}" aria-label="안내 닫기">×</button></div>`;
 }
 function adminEntryHtml(){
   if(ST.user)return `<p class="hint" style="text-align:center">${esc(ST.user.email)} 로그인됨${ST.admin?' · 운영진':' · 운영진 목록에 없어요'} · <a href="#" data-act="logout">로그아웃</a></p>`;
@@ -243,7 +252,10 @@ function gameHtml(){
   loadAtt(a.date);
   const D=dates(),qs=sortedAna().filter(x=>x.date===a.date),me=ST.me.pid;
   const sel=`<select data-date>${D.map(d=>`<option value="${d}" ${d===a.date?'selected':''}>${dLabel(d)} 경기</option>`).join('')}</select>`;
-  const qb=`<div class="qs" style="margin-top:.5rem">${qs.map(x=>`<button data-sel="${esc(x.id)}" class="${x.id===a.id?'on':''}">${x.q}쿼터${tidsOf(x,me).length?' ✓':''}</button>`).join('')}</div>`;
+  const qb=`<div class="qs" style="margin-top:.5rem">${qs.map(x=>`<button data-sel="${esc(x.id)}" class="${x.id===a.id?'on':''}">${x.q}쿼터${tidsOf(x,me).length?' ✓':(x.tracks||[]).length?' ?':''}</button>`).join('')}</div>`;
+  // 아직 나를 안 찾은 쿼터 수
+  const unf=qs.filter(x=>(x.tracks||[]).length&&!tidsOf(x,me).length).length;
+  const unfH=unf?`<p class="hint" style="margin:.5rem 0 0">아직 나를 안 찾은 쿼터 <b class="warn">${unf}개</b> (? 표시) · 안 찾은 쿼터는 내 기록에는 빠지지만 팀 기록에는 들어가요.</p>`:'';
   const s=statOf(a,me);
   // 내 경기 분석: 이 쿼터 / 그날 합계를 버튼으로 바꿔 본다
   const MD=dayStats(me),dd=MD.find(x=>x.date===a.date),gv=ST.gview==='d'&&dd?'d':'q';
@@ -256,9 +268,9 @@ function gameHtml(){
   else if(s){const prevQ=myQ.filter(r=>r.a.date===a.date&&r.a.q<a.q).pop();
     body=reportHtml(s,pitchOf(a),'q'+a.id,{avg:avgOf(myQ.filter(r=>r.a.id!==a.id).map(r=>r.s)),sents:sentences(s,{rows:scopeRows('q',a.id),prev:prevQ&&prevQ.s,prevLabel:prevQ?`앞 쿼터(${prevQ.a.q}쿼터)`:''}),extra:teamHtml(a)})}
   else body=`<p class="hint">이 쿼터에서 아직 내가 누구인지 몰라요. 위 <b>나 찾기</b>에서 나를 골라 주세요.</p>`;
-  return `<div class="card">${sel}${qb}</div>
+  return `<div class="card">${sel}${qb}${unfH}</div>
   <div class="card"><h2>${a.q}쿼터 영상 <span class="hint">${a.startMs?hm(a.startMs)+(a.endMs?'~'+hm(a.endMs):''):''}</span></h2>${videoHtml(a)}</div>
-  <div class="card"><h2>나 찾기</h2>${findHtml(a)}</div>
+  <div class="card" id="findCard"><h2>나 찾기</h2>${findHtml(a)}</div>
   <div class="card"><h2>한눈에 보기</h2>${seg}${body}</div>`;
 }
 function ytId(u){if(!u)return null;const m=String(u).match(/(?:youtu\.be\/|v=|embed\/|shorts\/|live\/)([\w-]{11})/);return m?m[1]:(/^[\w-]{11}$/.test(u)?u:null)}
@@ -272,12 +284,6 @@ function videoHtml(a){
 // 주인 정하는 순서: 작전판·운영진이 tracks 에 붙인 pid > 회원이 고른 mine/{pid} > 옛 방식 claim/{tid}
 const MINE_HOURS=18;   // 처음 고른 뒤 이 시간 안에는 본인이 바꿀 수 있다(Firestore 규칙과 같은 값)
 function mineInv(a){const m=ST.mine[a.id];if(!m)return {};if(m._inv)return m._inv;const r={};for(const pid in m){if(pid[0]!=='_'&&m[pid]&&m[pid].tid!=null)r[String(m[pid].tid)]=pid}Object.defineProperty(m,'_inv',{value:r,enumerable:false});return r}
-function ownerOf(a,tid){
-  tid=String(tid);const t=(a.tracks||[]).find(x=>String(x.tid)===tid);if(t&&t.pid)return t.pid;
-  const mp=mineInv(a)[tid];if(mp)return mp;
-  const c=ST.claims[a.id]&&ST.claims[a.id][tid];if(c&&!(ST.mine[a.id]&&ST.mine[a.id][c.pid]))return c.pid;   // 새로 고른 사람이면 옛 claim 은 무시
-  return null;
-}
 const tsMs=v=>v&&v.toMillis?v.toMillis():typeof v==='number'?v:null;
 function teamColor(a,tm){return (a.team&&a.team[tm]&&a.team[tm].color)||{A:'#2563eb',B:'#dc2626'}[tm]||'#64748b'}
 function posWords(p,P){const x=p[0]/P.w,y=p[1]/P.h;return (x<.38?'수비':x<.66?'중앙':'공격')+' '+(y<.34?'왼쪽':y<.67?'가운데':'오른쪽')}
@@ -293,40 +299,81 @@ function cropHtml(a,tid,cls){
 }
 function bigCrops(a,tid){const c=ST.crops[a.id]&&ST.crops[a.id][tid],J=(c&&c.jpgs||[]).slice(0,3);
   return J.length?`<div class="bigc">${J.map(j=>`<img src="${j.startsWith('data:')?j:'data:image/jpeg;base64,'+j}" alt="선수 사진">`).join('')}</div>`:`<div class="bigc">${cropHtml(a,tid,'lg')}</div>`}
+function ownerOf(a,tid){
+  tid=String(tid);const t=(a.tracks||[]).find(x=>String(x.tid)===tid);if(t&&t.pid)return t.pid;
+  const mp=mineInv(a)[tid];if(mp)return mp;
+  const c=ST.claims[a.id]&&ST.claims[a.id][tid];if(c&&!(ST.mine[a.id]&&ST.mine[a.id][c.pid]))return c.pid;   // 새로 고른 사람이면 옛 claim 은 무시
+  // 자동 연결: 분석기가 같은 날 옷 색으로 확신한 경우(suggest.auto). 그 회원이 이 쿼터에서 직접 고른 게 없을 때만
+  if(t&&t.suggest&&t.suggest.auto&&t.suggest.pid){const p=t.suggest.pid;if(!(ST.mine[a.id]&&ST.mine[a.id][p])&&!Object.values(ST.claims[a.id]||{}).some(x=>x.pid===p)&&!(a.tracks||[]).some(x=>x.pid===p))return p}
+  return null;
+}
+// 이 쿼터에서 나를 어떻게 찾았는지: 'board' 작전판, 'admin' 운영진, 'mine' 내가 고름, 'claim' 옛 방식, 'auto' 자동 연결
+function howFound(a,tid){const me=ST.me.pid,t=(a.tracks||[]).find(x=>String(x.tid)===String(tid));if(t&&t.pid===me)return t.by==='admin'?'admin':'board';
+  if(mineInv(a)[String(tid)]===me)return 'mine';const c=ST.claims[a.id]&&ST.claims[a.id][tid];if(c&&c.pid===me)return 'claim';return 'auto'}
+// 그날 후보가 될 사람: 출석 체크한 사람(없으면 전체 명단), 쿼터 출전 명단(ana.lineup)이 있으면 그 안에서
+function poolOf(a){const att=ST.attSet[a.date],L=Array.isArray(a.lineup)&&a.lineup.length?new Set(a.lineup):null;
+  let P=(ST.P&&ST.P.names||[]).map(n=>n.id);if(att&&att.size)P=P.filter(p=>att.has(p));if(L)P=P.filter(p=>L.has(p));return new Set(P)}
+// 나에게 추천할 선수: 분석기의 suggest(옷 색, auto 아님) 또는 cands(습관) 중 내 점수가 가장 높은 것
+function recommendFor(a){
+  const me=ST.me.pid,pool=poolOf(a);if(pool.size&&!pool.has(me))return null;let best=null;
+  (a.tracks||[]).forEach(t=>{if(ownerOf(a,t.tid))return;let sc=null,why='';
+    if(t.suggest&&t.suggest.pid===me&&!t.suggest.auto){sc=(t.suggest.score||0)+1;why='앞 쿼터에서 찾은 모습과 옷이 비슷해요.'}
+    else if(Array.isArray(t.cands)){const c=t.cands.find(x=>x.pid===me);if(c){sc=c.score||0;why='평소 내가 뛰는 자리·움직임과 비슷해요.'}}
+    if(sc!=null&&(!best||sc>best.sc))best={t,sc,why}});
+  return best;
+}
 function findHtml(a){
   const me=ST.me.pid,tr=a.tracks||[],myT=tidsOf(a,me),P=pitchOf(a);
   if(!ST.crops[a.id])loadCrops(a.id);
   if(!tr.length)return `<p class="hint">이 쿼터는 아직 선수 분석이 안 됐어요.</p>`;
-  // 1) 이미 찾음
+  // 1) 이미 찾음(자동 연결 포함)
   if(myT.length&&!ST.reFind[a.id]){
-    const tid=myT[0],t=tr.find(x=>String(x.tid)===tid),mi=ST.mine[a.id]&&ST.mine[a.id][me];
-    const by=t&&t.pid===me?(t.by==='admin'?'운영진이 정해 줬어요.':'작전판 배치로 자동으로 찾았어요.'):'내가 골랐어요.';
-    // 내가 고른 경우: 새 방식(mine)은 처음 고른 뒤 MINE_HOURS 안, 옛 방식(claim)은 새로 고르면 덮이므로 언제든 바꿀 수 있다
-    const ft=mi&&tsMs(mi.firstTs),can=mi?(!ft||Date.now()<ft+MINE_HOURS*36e5):!(t&&t.pid===me);
-    return `<div class="found">${cropHtml(a,tid,'lg')}<div><p style="margin:0"><b>${esc(ST.me.name)} 님을 찾았어요</b></p><p class="hint">${by}</p>
-      ${can?'<button data-act="refind">다른 사람이었어요</button>':`<p class="hint">틀렸으면 운영진에게 말해 주세요.</p>`}</div></div>`;
+    const tid=myT[0],how=howFound(a,tid),mi=ST.mine[a.id]&&ST.mine[a.id][me];
+    const ft=mi&&tsMs(mi.firstTs),can=how==='auto'||how==='claim'||(how==='mine'&&(!ft||Date.now()<ft+MINE_HOURS*36e5));
+    const txt={admin:'운영진이 정해 줬어요.',board:'작전판 배치로 찾았어요.',mine:'내가 골랐어요.',claim:'내가 골랐어요.',auto:'앞 쿼터 모습으로 자동으로 연결했어요.'}[how];
+    return `<div class="found">${cropHtml(a,tid,'lg')}<div><p style="margin:0"><b>${esc(ST.me.name)} 님을 찾았어요</b></p><p class="hint">${txt}</p>
+      ${can?`<button data-act="refind">${how==='auto'?'내가 아니에요 · 바꾸기':'다른 사람이었어요'}</button>`:`<p class="hint">틀렸으면 운영진에게 말해 주세요.</p>`}</div></div>`;
   }
-  // 2) 자동 제안: 분석기가 같은 날 앞 쿼터 기록으로 tracks[].suggest 를 넣어 줌
-  const sg=tr.find(t=>t.suggest&&t.suggest.pid===me&&!ownerOf(a,t.tid));
-  if(sg&&!ST.sugNo[a.id]&&!ST.reFind[a.id])
-    return `<div class="found">${cropHtml(a,sg.tid,'lg')}<div><p style="margin:0"><b>이번 쿼터에서는 이 사람이 ${esc(ST.me.name)} 님 같아요</b></p><p class="hint">앞 쿼터에서 찾은 모습과 비슷해요.</p>
-      <div class="row" style="margin-top:.4rem"><button class="pri" data-act="sugYes" data-t="${esc(sg.tid)}">맞아요</button><button data-act="sugNo">아니에요</button></div></div></div>`;
+  // 2) 추천 맨 위: "혹시 이분인가요?"
+  const rc=!ST.sugNo[a.id]&&!ST.reFind[a.id]?recommendFor(a):null;
+  if(rc)return `<div class="found">${cropHtml(a,rc.t.tid,'lg')}<div><p style="margin:0"><b>혹시 이분인가요?</b></p><p class="hint">${rc.why}</p>
+      <div class="row" style="margin-top:.4rem"><button class="pri" data-act="sugYes" data-t="${esc(rc.t.tid)}">맞아요</button><button data-act="sugNo">아니에요</button></div></div></div>`;
   // 3) 사진에서 고르기
   if(ST.pick[a.id]){const tid=ST.pick[a.id],t=tr.find(x=>String(x.tid)===tid);
     return `${bigCrops(a,tid)}<p style="text-align:center;margin:.4rem 0"><span class="dot" style="background:${teamColor(a,t&&t.team)}"></span>${t&&t.team?t.team+'팀':''}</p>
       <div class="row"><button class="pri" data-act="mineYes" data-t="${esc(tid)}">이 사람이 나예요</button><button data-act="pickNo">다른 사람 보기</button></div>`}
   const teams=[...new Set(tr.map(t=>t.team).filter(Boolean))].sort(),ft=ST.fteam[a.id];
-  const bp=a.board&&a.board[me];
+  const bp=a.board&&a.board[me],pf=ST.prof[me];
   let C=tr.filter(t=>(!ft||t.team===ft)&&(!ownerOf(a,t.tid)||ownerOf(a,t.tid)===me));
+  // 정렬: 작전판 자리 > 내 습관 프로필(평소 위치) > 분석기 후보 점수
+  const zOf=t=>{const i=idfOf(a,t);return i&&i.zone};
   if(bp){const d=t=>{const s=a.stats&&a.stats[t.tid],p=s&&s.avg;return p?Math.hypot(p[0]-bp[0],p[1]-bp[1]):1e9};C=C.slice().sort((x,y)=>d(x)-d(y))}
-  // 출석한 사람 수만큼만(팀을 골랐으면 팀 몫만) 먼저 보여 주고 나머지는 더 보기
-  const att=ST.att[a.date]||0,lim=att?Math.ceil(att/(ft&&teams.length?teams.length:1))+1:99,show=ST.more[a.id]?C:C.slice(0,lim);
-  return `<p class="hint" style="margin:0 0 .5rem">사진에서 <b>나</b>를 눌러 주세요. 같은 날에는 나중에 바꿀 수 있어요.</p>
+  else if(pf&&pf.zone){const d=t=>{const z=zOf(t);return z?Math.hypot(z[0]-pf.zone[0],z[1]-pf.zone[1]):9};C=C.slice().sort((x,y)=>d(x)-d(y))}
+  // 출석한 사람 수만큼(팀을 골랐으면 팀 몫만) 먼저 보여 주고 나머지는 더 보기
+  const att=poolOf(a).size,lim=att&&att<((ST.P&&ST.P.names||[]).length)?Math.ceil(att/(ft&&teams.length?teams.length:1))+1:99,show=ST.more[a.id]?C:C.slice(0,lim);
+  return `<p class="hint" style="margin:0 0 .5rem">사진에서 <b>나</b>를 눌러 주세요. 한 쿼터만 찾으면 같은 날 다른 쿼터는 자동으로 찾아 드려요.</p>
     ${teams.length>1?`<p style="margin:0 0 .3rem;font-weight:700;font-size:.9rem">먼저 내 조끼 색을 고르세요</p><div class="seg">${teams.map(tm=>`<button data-fteam="${tm}" class="${ft===tm?'on':''}"><span class="dot" style="background:${teamColor(a,tm)}"></span>${tm}팀</button>`).join('')}<button data-fteam="" class="${!ft?'on':''}">전체</button></div>`:''}
-    ${bp?`<p class="hint" style="margin:0 0 .4rem">작전판에서 <b>${posWords(bp,P)}</b> 자리였어요. 가까운 선수부터 보여요.</p>`:''}
+    ${bp?`<p class="hint" style="margin:0 0 .4rem">작전판에서 <b>${posWords(bp,P)}</b> 자리였어요. 가까운 선수부터 보여요.</p>`:pf&&pf.zone?`<p class="hint" style="margin:0 0 .4rem">평소 <b>${posWords([pf.zone[0]*P.w,pf.zone[1]*P.h],P)}</b>에서 뛰어서 그 근처 선수부터 보여요.</p>`:''}
     <div class="cands">${show.map(t=>`<button data-cand="${esc(t.tid)}" style="border-color:${teamColor(a,t.team)}" aria-label="${t.team||''}팀 선수">${cropHtml(a,t.tid)}</button>`).join('')||'<p class="hint">고를 수 있는 선수가 없어요.</p>'}</div>
     ${show.length<C.length?`<button data-act="more" style="width:100%;margin-top:.4rem">더 보기 (${C.length-show.length}명)</button>`:''}
     <details class="axh" style="margin-top:.5rem"><summary>전체 장면에서 보기</summary>${frameHtml(a)}</details>`;
+}
+// 습관 식별 정보: 분석기가 준 tracks[].idf, 없으면 stats 로 대신 만든다(키는 없음)
+function idfOf(a,t){
+  if(t.idf)return t.idf;const s=a.stats&&a.stats[t.tid];if(!s)return null;const P=pitchOf(a);
+  return {zone:s.avg?[+(s.avg[0]/P.w).toFixed(3),+(s.avg[1]/P.h).toFixed(3)]:null,lanes:s.lanes||null,thirds:s.thirds||null};
+}
+// 습관 프로필 갱신: 경기 날 하루에 한 번(그날 첫 확정)만, 새 값 = 이전 + (이번 - 이전) / min(n+1, 8)
+async function updateProf(a,tid){
+  const t=(a.tracks||[]).find(x=>String(x.tid)===String(tid));if(!t)return;const v=idfOf(a,t);if(!v)return;
+  const F=ST.F,me=ST.me.pid,ref=F.doc(ST.db,'pub',ST.conf.code,'prof',me);
+  try{const ex=await F.getDoc(ref),o=ex.exists()?ex.data():{n:0,days:[]};const days=o.days||[];if(days.includes(a.date))return;
+    const n=o.n||0,w=1/Math.min(n+1,8),mix=(p,q)=>p==null?q:q==null?p:+(p+(q-p)*w).toFixed(3);
+    const mixO=(p,q)=>{if(!q)return p||null;if(!p)return q;const r={};for(const k in q)r[k]=mix(p[k],q[k]);return r};
+    const out={hM:mix(o.hM??null,v.hM??null),zone:v.zone&&o.zone?[mix(o.zone[0],v.zone[0]),mix(o.zone[1],v.zone[1])]:(v.zone||o.zone||null),
+      lanes:mixO(o.lanes,v.lanes),thirds:mixO(o.thirds,v.thirds),n:n+1,days:[...days,a.date].slice(-8),upd:Date.now()};
+    await F.setDoc(ref,out);ST.prof[me]=out;
+  }catch(e){}
 }
 // 전체 장면(보기 전용): 내 네모는 노란색
 function frameHtml(a){
@@ -340,7 +387,7 @@ async function saveMine(a,tid){
   const F=ST.F,ref=F.doc(ST.db,'pub',ST.conf.code,'ana',a.id,'mine',me);
   try{const ex=await F.getDoc(ref);const now=F.serverTimestamp();
     await F.setDoc(ref,ex.exists()?{tid:String(tid),ts:now,firstTs:ex.data().firstTs}:{tid:String(tid),ts:now,firstTs:now});
-    ST.pick[a.id]=null;ST.reFind[a.id]=false;await loadClaims(a.id);say('나를 찾았어요! 이제 내 기록이 보여요.','ok')}
+    ST.pick[a.id]=null;ST.reFind[a.id]=false;await loadClaims(a.id);updateProf(a,tid);say('나를 찾았어요! 이제 내 기록이 보여요.','ok')}
   catch(e){say('저장하지 못했어요. 처음 고른 지 오래됐으면 운영진에게 바꿔 달라고 해 주세요.','bad')}
 }
 async function loadCrops(id){
@@ -350,7 +397,7 @@ async function loadCrops(id){
 // 그날 출석한 사람 수(출석 체크 기록). 시험 코드에는 없어서 0 → 제한 없음
 async function loadAtt(date){
   if(ST.att[date]!=null)return;ST.att[date]=0;
-  try{const F=ST.F,qs=await F.getDocs(F.query(F.collection(ST.db,'pub',ST.conf.code,'in'),F.where('date','==',date)));ST.att[date]=new Set(qs.docs.map(d=>d.data().pid)).size;render()}catch(e){}
+  try{const F=ST.F,qs=await F.getDocs(F.query(F.collection(ST.db,'pub',ST.conf.code,'in'),F.where('date','==',date)));const S=new Set(qs.docs.map(d=>d.data().pid));ST.att[date]=S.size;ST.attSet[date]=S;render()}catch(e){}
 }
 // ---------- 경기 리포트 (쿼터 하나 또는 그날 합계) ----------
 // 카메라 영상으로 잰 순간 값(최고 속도, 가속·감속)은 오차가 있을 수 있어 "참고" 표시를 붙인다
@@ -756,6 +803,8 @@ function camHtml(){
   <div class="kpi"><div><b>${c.seg??'-'}</b><span>1분 파일 번호</span></div><div><b class="${c.battery!=null&&c.battery<=20?'bad':''}">${c.battery??'-'}%</b><span>배터리</span></div><div><b class="${c.tempC!=null&&c.tempC>=42?'bad':''}">${c.tempC!=null?Math.round(c.tempC)+'°':'-'}</b><span>온도</span></div>
   <div><b class="${c.freeMin!=null&&c.freeMin<30?'bad':''}">${c.freeMin!=null?Math.round(c.freeMin)+'분':'-'}</b><span>남은 녹화</span></div><div><b>${c.upDone??0}/${c.upTotal??0}</b><span>드라이브 업로드</span></div><div><b>${c.viewStream?'켜짐':'꺼짐'}</b><span>시청용 1080p</span></div></div>`;
 }
+// 이름 고치기 목록: 그날 출석한 사람을 먼저(이름 앞 ●)
+function namesForFix(a){loadAtt(a.date);const S=ST.attSet[a.date],N=(ST.P.names||[]).slice();if(!S||!S.size)return N;return [...N.filter(n=>S.has(n.id)).map(n=>Object.assign({},n,{name:'● '+n.name})),...N.filter(n=>!S.has(n.id))]}
 function adminHtml(){
   const a=curAna(),code=ST.conf.code,link=`matchcam://link?code=${encodeURIComponent(code)}`;
   const qa=sortedAna().filter(x=>a&&x.date===a.date);
@@ -766,7 +815,7 @@ function adminHtml(){
     <ul class="list">${marks.map(x=>`<li>${hm(x.ts)} ${x.q?x.q+'쿼터 · ':''}${esc(x.text)}</li>`).join('')||'<li class="hint">아직 표시한 장면이 없어요.</li>'}</ul></div>
   ${a?`<div class="card"><h2>쿼터 영상 링크 · ${dLabel(a.date)}</h2>${qa.map(x=>`<div class="row" style="margin:.3rem 0"><span style="flex:0 0 3.2rem">${x.q}쿼터</span><input data-yt="${esc(x.id)}" value="${esc((x.video&&x.video.yt)||'')}" placeholder="유튜브 링크 붙여넣기"></div>`).join('')}<button class="pri" data-act="saveYt" style="width:100%;margin-top:.4rem">영상 링크 저장</button></div>
   <div class="card"><h2>선수 이름 고치기 · ${a.q}쿼터</h2><p class="hint" style="margin:0 0 .4rem">경기 탭에서 고른 쿼터예요. 추적 번호마다 선수를 지정하면 회원의 나 찾기보다 먼저 적용돼요.</p>
-    <ul class="list">${(a.tracks||[]).map(t=>{const o=ownerOf(a,t.tid),s=a.stats&&a.stats[t.tid];return `<li><span style="flex:0 0 5.5rem">${t.team?t.team+'팀 ':''}#${esc(t.tid)}<br><small class="hint">${s?km(s.distM):''}${t.by?' · '+({board:'작전판',claim:'본인',admin:'운영진'}[t.by]||t.by):(!t.pid&&o?' · 본인':'')}</small></span><select data-pid="${esc(t.tid)}"><option value="">(모름)</option>${(ST.P.names||[]).map(n=>`<option value="${esc(n.id)}" ${n.id===o?'selected':''}>${esc(n.name)}</option>`).join('')}</select></li>`}).join('')}</ul>
+    <ul class="list">${(a.tracks||[]).map(t=>{const o=ownerOf(a,t.tid),s=a.stats&&a.stats[t.tid];return `<li><span style="flex:0 0 5.5rem">${t.team?t.team+'팀 ':''}#${esc(t.tid)}<br><small class="hint">${s?km(s.distM):''}${t.by?' · '+({board:'작전판',claim:'본인',admin:'운영진'}[t.by]||t.by):(!t.pid&&o?' · 본인':'')}</small></span><select data-pid="${esc(t.tid)}"><option value="">(모름)</option>${namesForFix(a).map(n=>`<option value="${esc(n.id)}" ${n.id===o?'selected':''}>${esc(n.name)}</option>`).join('')}</select></li>`}).join('')}</ul>
     <button class="pri" data-act="savePid" style="width:100%;margin-top:.4rem">이름 저장</button></div>`:''}
   <div class="card"><h2>촬영 폰 연결</h2><p class="hint" style="margin:0">촬영 앱에서 <b>서버 연결 → QR 읽기</b>로 아래를 찍어 주세요.</p><div class="qr" id="camQr"></div><p class="hint" style="text-align:center;word-break:break-all">코드: <b>${esc(code)}</b></p></div>
   <div class="card"><h2>운영진</h2>${ST.user?`<p>${esc(ST.user.email)} ${ST.admin?'<span class="pill on">운영진</span>':'<span class="pill off">목록에 없음</span>'}</p>`:'<p class="hint">이 휴대폰은 기존 연결 링크로 관리 권한이 있어요.</p>'}
@@ -846,6 +895,8 @@ document.addEventListener('click',e=>{
   else if(['refind','sugYes','sugNo','mineYes','pickNo','more'].includes(k)){const a=curAna();if(!a)return;
     if(k==='refind'){ST.reFind[a.id]=true;ST.sugNo[a.id]=true;render()}else if(k==='sugNo'){ST.sugNo[a.id]=true;render()}else if(k==='pickNo'){ST.pick[a.id]=null;render()}
     else if(k==='more'){ST.more[a.id]=true;render()}else saveMine(a,ac.dataset.t)}
+  else if(k==='goFind'){ST.tab='game';ST.sel=ac.dataset.t;ST.gview='q';render();const c=document.getElementById('findCard');if(c)c.scrollIntoView({block:'start'})}
+  else if(k==='banOff'){let off=[];try{off=JSON.parse(localStorage.getItem('bz-banoff')||'[]')}catch(e){}off=[...off,ac.dataset.t].slice(-60);try{localStorage.setItem('bz-banoff',JSON.stringify(off))}catch(e){}render()}
   else if(k==='login')login();else if(k==='logout'){ST.A&&ST.A.signOut(ST.auth)}
   else if(k==='oldAdmin'){try{sessionStorage.setItem('bz-admin','1')}catch(err){}location.href='index.html'}
   else if(k==='mark')addMark();else if(k==='saveYt')saveYt();else if(k==='savePid')savePid();
@@ -869,6 +920,8 @@ async function start(){
     ST.F=F;ST.db=F.getFirestore(app);const code=ST.conf.code;
     initAuth(app);
     F.onSnapshot(F.doc(ST.db,'pub',code),s=>{ST.P=s.exists()?s.data():null;if(!ST.P)ST.err='회원 화면이 아직 준비되지 않았어요. 운영자에게 알려 주세요.';render()},()=>{ST.err='연결하지 못했어요. 인터넷 연결을 확인해 주세요.';render()});
+    // 내 습관 프로필(나 찾기 후보 정렬용)
+    if(ST.me)F.getDoc(F.doc(ST.db,'pub',code,'prof',ST.me.pid)).then(s=>{if(s.exists()){ST.prof[ST.me.pid]=s.data();render()}}).catch(()=>{});
     if(ST.me&&!ST.test){F.getDoc(F.doc(ST.db,'pub',code,'bind',ST.me.pid)).then(s=>{if(!s.exists()||s.data().dev!==DEV){const nm=ST.me.name;ST.me=null;saveMe(null);say(`${nm} 님 등록이 해제됐어요. 이름을 다시 골라 주세요.`,'bad')}}).catch(()=>{})}
     // 분석 문서: 최근 것부터 60개(첫 장면 사진이 들어 있어 많이 받지 않는다)
     F.onSnapshot(F.query(F.collection(ST.db,'pub',code,'ana'),F.orderBy('startMs','desc'),F.limit(60)),qs=>{

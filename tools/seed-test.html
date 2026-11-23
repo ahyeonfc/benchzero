@@ -81,6 +81,8 @@ function quarter(date,q,startMs){
       turns:Math.round((12+rnd()*22)*lv),rsa:sprints>=2?Math.floor(rnd()*sprints):0,boxEntries:Math.round(fx>0.55?2+rnd()*5:fx>0.35?rnd()*3:rnd()),lineDevM:+((2+rnd()*5)/lv).toFixed(1),
       hsrHalves:(()=>{const a=Math.round(hsr*(0.5+rnd()*0.12));return [a,hsr-a]})()};
   }
+  // 습관 식별 정보(idf): 키(m), 평균 위치(운동장 비율), 좌우·앞뒤 비율
+  tracks.forEach(t=>{const s=stats[t.tid];t.idf={hM:+(1.62+((+t.tid%7)*0.03)).toFixed(2),zone:[+(s.avg[0]/100).toFixed(3),+(s.avg[1]/64).toFixed(3)],lanes:s.lanes,thirds:s.thirds}});
   return {v:1,date,q,startMs,endMs:startMs+25*6e4,source:'benchzero',video:{yt:q===1?'https://youtu.be/aqz-KE-bpKQ':null,drive:q===2?'https://drive.google.com/':null,offsetSec:0},
     frame:{w:1280,h:720,jpg:frame(tracks)},tracks,stats,
     team:{A:{lineYm:28.4+q,widthM:41.2,lengthM:33.5,distM:22400,color:'#1d4ed8'},B:{lineYm:31.0-q,widthM:38.7,lengthM:30.1,distM:21800,color:'#ea580c'}},
@@ -95,10 +97,16 @@ document.getElementById('go').onclick=async()=>{
       // 지난 경기에서는 p5(정대현)도 이미 나 찾기를 마친 것으로
       if(d!=='2026-11-22'){a.tracks[4].pid='p5';a.tracks[4].by='claim';a.tracks[8].pid='p9';a.tracks[8].by='admin'}
       // 이번 경기 3쿼터: 강성민(p6)에게 자동 제안, 작전판 자리(pid → 운동장 m)로 후보 정렬 시험
-      if(d==='2026-11-22'&&q===3){a.tracks[5].suggest={pid:'p6',score:0.82};a.board={};a.tracks.slice(0,7).forEach((t,i)=>{const s=a.stats[t.tid];a.board['p'+(i+1)]=[+(s.avg[0]+(rnd()-.5)*8).toFixed(1),+(s.avg[1]+(rnd()-.5)*8).toFixed(1)]})}
+      // 세 경우: 2쿼터 p7 자동 연결(auto), 3쿼터 p8 한 번 묻기(옷 색), 3쿼터 p10 습관 후보(cands), p12 는 추천 없음 → 사진 목록
+      if(d==='2026-11-22'&&q===2){a.tracks[6].suggest={pid:'p7',score:0.91,auto:true}}
+      if(d==='2026-11-22'&&q===3){a.tracks[7].suggest={pid:'p8',score:0.81,auto:false};a.tracks[9].cands=[{pid:'p10',score:0.72},{pid:'p11',score:0.41}];a.board={};a.tracks.slice(0,7).forEach((t,i)=>{const s=a.stats[t.tid];a.board['p'+(i+1)]=[+(s.avg[0]+(rnd()-.5)*8).toFixed(1),+(s.avg[1]+(rnd()-.5)*8).toFixed(1)]})}
       await F.setDoc(F.doc(db,'pub',CODE,'ana',`${d}_${q}`),a);log(`분석 ${d}_${q} 저장 (첫 장면 ${Math.round(a.frame.jpg.length*3/4/1024)}KB)`);
       // 선수 확대 사진(나 찾기용): 이번 경기만
       if(d==='2026-11-22'){for(const [i,t] of a.tracks.entries())await F.setDoc(F.doc(db,'pub',CODE,'ana',`${d}_${q}`,'crop',t.tid),{tid:t.tid,jpgs:[cropImg(t.team,i,0),cropImg(t.team,i,1)],ts:Date.now()});log(`  선수 사진 ${a.tracks.length}명 저장`)}}}
+    // 출석 기록(이번 경기 12명): 나 찾기 후보 좁히기 시험. 이미 있으면 규칙상 다시 못 써서 건너뜀
+    for(let i=1;i<=12;i++){const n=NAMES[i-1];try{await F.setDoc(F.doc(db,'pub',CODE,'in','2026-11-22_'+n.id),{pid:n.id,name:n.name,dev:'seed',date:'2026-11-22',ev:'',ts:F.serverTimestamp(),dist:null,acc:null})}catch(e){}}log('출석 기록 12명');
+    // 습관 프로필: p10(한상우)은 지난 경기들로 쌓인 프로필이 있다고 가정
+    await F.setDoc(F.doc(db,'pub',CODE,'prof','p10'),{hM:1.71,zone:[0.62,0.38],lanes:{l:0.3,c:0.45,r:0.25},thirds:{def:0.2,mid:0.5,att:0.3},n:3,days:['2026-11-01','2026-11-08','2026-11-15'],upd:Date.now()});log('습관 프로필 p10');
     await F.setDoc(F.doc(db,'pub',CODE,'cam','state'),{rec:true,sinceMs:Date.now()-42*6e4,seg:43,battery:71,tempC:38.5,freeMin:150,upDone:41,upTotal:42,viewStream:true,ts:Date.now()});log('촬영 폰 상태 저장');
     log('끝. 회원 화면에서 정대현(p5)을 골라 보세요.');
   }catch(e){log('오류: '+(e.code||e.message))}
@@ -119,6 +127,7 @@ document.getElementById('chk').onclick=async()=>{
   await t('mine 바꾸기(처음 고른 시각 유지)',async()=>{const s=await F.getDoc(mref);await F.setDoc(mref,{tid:'2',ts:F.serverTimestamp(),firstTs:s.data().firstTs})});
   await t('mine 처음 시각 바꾸기는 막혀야 함(✗가 정상)',()=>F.setDoc(mref,{tid:'3',ts:F.serverTimestamp(),firstTs:F.serverTimestamp()}));
   await t('mine 지우기는 막혀야 함(✗가 정상)',()=>F.deleteDoc(mref));
+  await t('prof 쓰기',()=>F.setDoc(F.doc(db,'pub',CODE,'prof','ptest'),{n:0,upd:Date.now()}));
   await t('crop 쓰기',()=>F.setDoc(F.doc(db,'pub',CODE,'ana','rulecheck_0','crop','1'),{tid:'1',jpgs:[],ts:Date.now()}));
   await t('rulecheck 문서 지우기',()=>F.deleteDoc(F.doc(db,'pub',CODE,'ana','rulecheck_0')));
 };
