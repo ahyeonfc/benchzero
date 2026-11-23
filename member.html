@@ -16,7 +16,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Ap
 header{background:var(--deep);color:#fff;padding:calc(.8rem + env(safe-area-inset-top)) 1rem .6rem;position:sticky;top:0;z-index:5}
 header h1{margin:0;font-size:1.15rem;display:flex;align-items:center;gap:.5rem}
 header h1 small{font-size:.8rem;font-weight:500;opacity:.85;margin-left:auto}
-#title{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.staff{min-height:1.9rem;padding:0 .6rem;font-size:.78rem;border-radius:1rem;background:#ffffff22;color:#fff;border:1px solid #ffffff55}
+header{position:sticky}.mbtn{min-height:1.9rem;width:2.1rem;padding:0;border:0;background:transparent;color:#fff;font-size:1.3rem;line-height:1;border-radius:1rem}.mbtn:hover,.mbtn[aria-expanded="true"]{background:#ffffff22}
+.hmenu{position:absolute;right:.8rem;top:calc(2.9rem + env(safe-area-inset-top));min-width:13rem;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:.8rem;box-shadow:0 .6rem 1.5rem #0004;padding:.35rem;z-index:20}.hmenu button{display:block;width:100%;text-align:left;border:0;background:transparent;min-height:2.6rem;font-weight:600}.hmenu button:hover{background:var(--bg)}.hmenu p{margin:.3rem .7rem .4rem;font-size:.78rem;color:var(--mute)}.staff{min-height:1.9rem;padding:0 .6rem;font-size:.78rem;border-radius:1rem;background:#ffffff22;color:#fff;border:1px solid #ffffff55}
 .tabs{display:flex;gap:.3rem;margin-top:.5rem;overflow-x:auto}
 .tabs button{background:transparent;color:#fff;border:1px solid #ffffff44;min-height:2.3rem;padding:0 .8rem;border-radius:2rem;font-size:.9rem;white-space:nowrap}
 .tabs button.on{background:#fff;color:var(--deep)}
@@ -117,7 +118,7 @@ details.more{margin-top:.7rem}details.more>summary{cursor:pointer;font-weight:80
 </style>
 </head>
 <body>
-<header><h1><span id="title">벤치제로</span><small id="who"></small><button id="staffBtn" class="staff" data-tab="admin" hidden>관리</button></h1><div class="tabs" id="tabs"></div></header>
+<header><h1><span id="title">벤치제로</span><small id="who"></small><button id="staffBtn" class="staff" data-tab="admin" hidden>관리</button><button id="menuBtn" class="mbtn" aria-label="메뉴" aria-haspopup="true" aria-expanded="false">⋯</button></h1><div id="menu" class="hmenu" role="menu" hidden></div><div class="tabs" id="tabs"></div></header>
 <main><div id="app"><p class="ld">불러오는 중…</p></div></main>
 <script src="qrcode.js"></script>
 <script type="module">
@@ -228,6 +229,7 @@ function render(){
   $('who').textContent=ST.me?ST.me.name+' 님':'';
   // 운영진 기기(구글 로그인한 운영진, 기존 연결 링크 기기)에만 상단 "관리" 버튼
   $('staffBtn').hidden=!(ST.admin||ST.linkAdmin)||!ST.me||ST.tab==='admin';
+  $('menuBtn').hidden=!ST.conf;$('menu').innerHTML=menuHtml();$('menu').hidden=!ST.menuOpen;$('menuBtn').setAttribute('aria-expanded',ST.menuOpen?'true':'false');
   if(!ST.conf){
     $('tabs').innerHTML='';
     app.innerHTML=`<div class="card"><h2>링크가 필요해요</h2><p>운영자가 보낸 <b>회원 링크</b>나 운동장의 <b>QR코드</b>로 들어와 주세요. 출석 링크로 한 번 들어왔던 휴대폰이면 자동으로 연결돼요.</p></div>${adminEntryHtml()}`;
@@ -250,12 +252,12 @@ function bannerHtml(){
   if(!un.length)return '';const a=un[un.length-1];
   return `<div class="banner"><span><b>${a.q}쿼터 분석이 나왔어요</b> · 나를 찾아 주세요</span><button class="pri" data-act="goFind" data-t="${esc(a.id)}">찾기</button><button class="x" data-act="banOff" data-t="${esc(a.id)}" aria-label="안내 닫기">×</button></div>`;
 }
-// 운영진 로그인 입구: 일반 회원에게는 숨김. 주소 끝 ?admin 이나 제목 길게 누르기(1.5초)로만 열린다
-function adminEntryHtml(){
-  if(ST.user)return `<p class="hint" style="text-align:center">${esc(ST.user.email)} 로그인됨${ST.admin?' · 운영진':' · 운영진 목록에 없어요'} · <a href="#" data-act="logout">로그아웃</a></p>`;
-  if(!ST.adminDoor)return '';
-  return `<p class="hint" style="text-align:center"><a href="#" data-act="login">운영진 구글 로그인</a>${ST.linkAdmin?' · <a href="#" data-act="oldAdmin">관리 화면</a>':''}</p>`;
+// 오른쪽 위 메뉴(⋯): 운영진도 회원과 같은 링크로 들어와 여기서 로그인한다. 로그인하면 "로그아웃"
+function menuHtml(){
+  if(ST.user)return `<p>${esc(ST.user.email)}<br>${ST.admin?'운영진으로 로그인됨':'운영진 목록에 없는 계정이에요'}</p><button data-act="logout" role="menuitem">로그아웃</button>`;
+  return `<button data-act="login" role="menuitem">운영진 로그인</button>${ST.linkAdmin?'<button data-act="oldAdmin" role="menuitem">로테이션·작전판 관리 화면</button>':''}`;
 }
+function adminEntryHtml(){return ''}
 function pickHtml(m){
   if(ST.confirm)return `<div class="card"><p style="text-align:center;font-size:1.15rem;font-weight:800;margin:0">${esc(ST.confirm.name)} 님이 맞나요?</p><p class="hint" style="text-align:center">이 휴대폰은 ${esc(ST.confirm.name)} 님 전용이 돼요(출석 체크와 같은 등록이에요).</p>${m}<div class="row" style="margin-top:.8rem"><button data-act="no">아니에요</button><button class="pri" data-act="yes">네, 맞아요</button></div></div>`;
   const q=ST.q.trim(),L=(ST.P.names||[]).filter(n=>!q||n.name.includes(q));
@@ -983,6 +985,9 @@ async function checkAdmin(){
 
 document.addEventListener('click',e=>{
   const t=e.target;
+  // 메뉴: 버튼으로 열고 닫기, 메뉴 밖을 누르면 닫기, 메뉴 안 항목을 누르면 실행 뒤 닫기
+  if(t.closest('#menuBtn')){ST.menuOpen=!ST.menuOpen;render();return}
+  if(ST.menuOpen){const inMenu=t.closest('#menu');ST.menuOpen=false;$('menu').hidden=true;$('menuBtn').setAttribute('aria-expanded','false');if(!inMenu)return}
   const tb=t.closest('[data-tab]');if(tb){ST.tab=tb.dataset.tab;ST.msg='';render();window.scrollTo(0,0);return}
   const p=t.closest('[data-pick]');if(p){const n=(ST.P.names||[]).find(x=>x.id===p.dataset.pick);if(n){ST.confirm=n;ST.msg='';render()}return}
   const sl=t.closest('[data-sel]');if(sl){ST.sel=sl.dataset.sel;ST.msg='';render();return}
@@ -1018,8 +1023,8 @@ async function loadClaims(id){
 async function start(){
   ST.conf=readConf();ST.me=loadMe();
   ST.linkAdmin=!!load('jogi-sync');   // 기존 연결 링크(축구회 코드)로 연결된 운영진 휴대폰
-  ST.adminDoor=/[?&]admin(=|&|$)/.test(location.search);   // 운영진 단톡방용 주소(member.html?admin)
-  titleDoor();
+  // 예전 운영진 주소(member.html?admin)로 들어오면 메뉴를 한 번 열어 둔다(안내에는 쓰지 않음)
+  ST.menuOpen=/[?&]admin(=|&|$)/.test(location.search);
   render();if(!ST.conf)return initAuth(null);
   try{
     const A=await import(`https://www.gstatic.com/firebasejs/${FBV}/firebase-app.js`);
@@ -1042,10 +1047,6 @@ async function start(){
     setInterval(()=>{if(ST.tab==='admin')render()},30000);
   }catch(e){ST.err='연결하지 못했어요. 인터넷 연결을 확인해 주세요.';render()}
 }
-// 숨은 입구: 제목 "벤치제로" 를 1.5초 길게 누르면 운영진 로그인 창
-function titleDoor(){const el=$('title');let tm=null;const stop=()=>{clearTimeout(tm);tm=null};
-  el.addEventListener('pointerdown',()=>{stop();tm=setTimeout(()=>{tm=null;ST.adminDoor=true;if(ST.user){ST.tab='admin';render()}else login()},1500)});
-  ['pointerup','pointerleave','pointercancel'].forEach(ev=>el.addEventListener(ev,stop));el.addEventListener('contextmenu',e=>e.preventDefault())}
 async function initAuth(app){
   try{
     const A=await import(`https://www.gstatic.com/firebasejs/${FBV}/firebase-auth.js`);
