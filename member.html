@@ -16,6 +16,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Ap
 header{background:var(--deep);color:#fff;padding:calc(.8rem + env(safe-area-inset-top)) 1rem .6rem;position:sticky;top:0;z-index:5}
 header h1{margin:0;font-size:1.15rem;display:flex;align-items:center;gap:.5rem}
 header h1 small{font-size:.8rem;font-weight:500;opacity:.85;margin-left:auto}
+#title{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.staff{min-height:1.9rem;padding:0 .6rem;font-size:.78rem;border-radius:1rem;background:#ffffff22;color:#fff;border:1px solid #ffffff55}
 .tabs{display:flex;gap:.3rem;margin-top:.5rem;overflow-x:auto}
 .tabs button{background:transparent;color:#fff;border:1px solid #ffffff44;min-height:2.3rem;padding:0 .8rem;border-radius:2rem;font-size:.9rem;white-space:nowrap}
 .tabs button.on{background:#fff;color:var(--deep)}
@@ -116,7 +117,7 @@ details.more{margin-top:.7rem}details.more>summary{cursor:pointer;font-weight:80
 </style>
 </head>
 <body>
-<header><h1><span id="title">벤치제로</span><small id="who"></small></h1><div class="tabs" id="tabs"></div></header>
+<header><h1><span id="title">벤치제로</span><small id="who"></small><button id="staffBtn" class="staff" data-tab="admin" hidden>관리</button></h1><div class="tabs" id="tabs"></div></header>
 <main><div id="app"><p class="ld">불러오는 중…</p></div></main>
 <script src="qrcode.js"></script>
 <script type="module">
@@ -124,6 +125,8 @@ details.more{margin-top:.7rem}details.more>summary{cursor:pointer;font-weight:80
 // 관리 메뉴: 구글 로그인한 운영진 또는 기존 연결 링크로 연결된 휴대폰에만 보인다
 const FBV='13.4.0';
 const DEF_CFG={"apiKey":"AIzaSyDvJZfjmVWOMXzNAgYciQC80qDx8n3iP6E","authDomain":"benchzero-50f14.firebaseapp.com","projectId":"benchzero-50f14","storageBucket":"benchzero-50f14.firebasestorage.app","messagingSenderId":"279178405228","appId":"1:279178405228:web:11cefb680a5a1c85837f49"};
+// 순위 탭(회원끼리 순위)을 보일지. 끄면 순위 탭, 나이대별 순위 전환, "함께 뛴 회원 중 ○번째" 문장, 그날 1위 배지를 함께 숨긴다
+const SHOW_RANK=false;
 const TEST_PREFIX='matchcamtest';   // 시험용 코드는 이 휴대폰에 저장하지 않는다(실제 출석 등록을 건드리지 않게)
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -215,13 +218,16 @@ function allRows(){const out=[];sortedAna().forEach(a=>{const seen=new Set();(a.
 
 // ---------- 화면 ----------
 function tabsHtml(){
-  const T=[['game','경기'],['mine','내 카드'],['rank','순위']];if(ST.admin||ST.linkAdmin)T.push(['admin','관리']);
+  // 관리는 탭이 아니라 상단의 작은 "관리" 버튼(운영진 기기에만)으로 들어간다
+  const T=[['game','경기'],['mine','내 카드']];if(SHOW_RANK)T.push(['rank','순위']);if(ST.tab==='admin')T.push(['admin','관리']);
   return T.map(([k,l])=>`<button data-tab="${k}" class="${ST.tab===k?'on':''}">${l}</button>`).join('');
 }
 function render(){
   const app=$('app');
   if(ST.P&&ST.P.title)$('title').textContent=ST.P.title+(ST.test?' (시험)':'');
   $('who').textContent=ST.me?ST.me.name+' 님':'';
+  // 운영진 기기(구글 로그인한 운영진, 기존 연결 링크 기기)에만 상단 "관리" 버튼
+  $('staffBtn').hidden=!(ST.admin||ST.linkAdmin)||!ST.me||ST.tab==='admin';
   if(!ST.conf){
     $('tabs').innerHTML='';
     app.innerHTML=`<div class="card"><h2>링크가 필요해요</h2><p>운영자가 보낸 <b>회원 링크</b>나 운동장의 <b>QR코드</b>로 들어와 주세요. 출석 링크로 한 번 들어왔던 휴대폰이면 자동으로 연결돼요.</p></div>${adminEntryHtml()}`;
@@ -232,6 +238,7 @@ function render(){
   if(!ST.me||ST.confirm){$('tabs').innerHTML='';app.innerHTML=pickHtml(m)+adminEntryHtml();bindPick();return}
   $('tabs').innerHTML=tabsHtml();
   if(ST.tab==='admin'&&!(ST.admin||ST.linkAdmin))ST.tab='game';
+  if(ST.tab==='rank'&&!SHOW_RANK)ST.tab='game';
   app.innerHTML=(ST.tab!=='admin'?bannerHtml():'')+m+(ST.tab==='game'?gameHtml():ST.tab==='mine'?mineHtml():ST.tab==='rank'?rankHtml():adminHtml())+(ST.tab!=='admin'?adminEntryHtml():'');
   afterRender();
 }
@@ -243,8 +250,10 @@ function bannerHtml(){
   if(!un.length)return '';const a=un[un.length-1];
   return `<div class="banner"><span><b>${a.q}쿼터 분석이 나왔어요</b> · 나를 찾아 주세요</span><button class="pri" data-act="goFind" data-t="${esc(a.id)}">찾기</button><button class="x" data-act="banOff" data-t="${esc(a.id)}" aria-label="안내 닫기">×</button></div>`;
 }
+// 운영진 로그인 입구: 일반 회원에게는 숨김. 주소 끝 ?admin 이나 제목 길게 누르기(1.5초)로만 열린다
 function adminEntryHtml(){
   if(ST.user)return `<p class="hint" style="text-align:center">${esc(ST.user.email)} 로그인됨${ST.admin?' · 운영진':' · 운영진 목록에 없어요'} · <a href="#" data-act="logout">로그아웃</a></p>`;
+  if(!ST.adminDoor)return '';
   return `<p class="hint" style="text-align:center"><a href="#" data-act="login">운영진 구글 로그인</a>${ST.linkAdmin?' · <a href="#" data-act="oldAdmin">관리 화면</a>':''}</p>`;
 }
 function pickHtml(m){
@@ -516,7 +525,7 @@ function reportHtml(s,P,key,ctx){
 function sentences(s,o){
   const out=[];
   const R=(o.rows||[]).filter(r=>nz(r.s.distM)).sort((x,y)=>y.s.distM-x.s.distM),i=R.findIndex(r=>r.pid===ST.me.pid);
-  if(R.length>=3&&i>=0)out.push(i===0?`함께 뛴 회원 ${R.length}명 중 <b>가장 많이</b> 뛰었어요.`:`함께 뛴 회원 ${R.length}명 중 <b>${i+1}번째</b>로 많이 뛰었어요.`);
+  if(SHOW_RANK&&R.length>=3&&i>=0)out.push(i===0?`함께 뛴 회원 ${R.length}명 중 <b>가장 많이</b> 뛰었어요.`:`함께 뛴 회원 ${R.length}명 중 <b>${i+1}번째</b>로 많이 뛰었어요.`);
   if(o.prev&&nz(o.prev.distM)&&nz(s.distM)){const d=s.distM-o.prev.distM;if(Math.abs(d)>=100)out.push(`${o.prevLabel}보다 <b>${km(Math.abs(d))} ${d>0?'더':'덜'}</b> 뛰었어요.`)}
   const e=endur(s);if(nz(e)){if(e>=0.95)out.push('후반에도 뛰는 양이 잘 유지됐어요.');else if(e<0.85)out.push(`후반에 뛴 거리가 <b>${Math.round((1-e)*100)}%</b> 줄었어요. 체력이 떨어진 거예요.`)}
   if(s.lanes){const L=[['l','왼쪽 측면'],['c','가운데'],['r','오른쪽 측면']].map(([k,n])=>[n,s.lanes[k]||0]).sort((x,y)=>y[1]-x[1]);if(L[0][1]>=0.45)out.push(`주로 <b>${L[0][0]}</b>에서 뛰었어요.`)}
@@ -767,10 +776,11 @@ function badgesHtml(D){
   const last=D[D.length-1],s=last.s,B=[],day=scopeRows('d',last.date);
   const recent=nowMs()-Date.parse(last.date+'T12:00')<7*864e5,when=recent?'이번 주':dLabel(last.date);
   const top=f=>{const L=day.filter(r=>nz(f(r.s)));return L.length>=2&&nz(f(s))&&L.every(r=>f(r.s)<=f(s))};
-  if(top(x=>x.distM))B.push(['🏃',`${when} 최다 거리`,km(s.distM)]);
+  // 그날 1위 배지는 회원끼리 순위라 SHOW_RANK 가 켜져 있을 때만
+  if(SHOW_RANK){if(top(x=>x.distM))B.push(['🏃',`${when} 최다 거리`,km(s.distM)]);
   if(top(x=>x.vmaxKmh))B.push(['⚡',`${when} 최고 속도`,s.vmaxKmh.toFixed(1)+'km/h']);
   if(top(x=>x.sprints))B.push(['🔥','스프린트왕',s.sprints+'회']);
-  if(top(x=>x.workRate))B.push(['💪','최고 활동량',Math.round(s.workRate)+'m/분']);
+  if(top(x=>x.workRate))B.push(['💪','최고 활동량',Math.round(s.workRate)+'m/분']);}
   if(D.length>1){const P=D.slice(0,-1);
     if((s.vmaxKmh||0)>Math.max(...P.map(d=>d.s.vmaxKmh||0)))B.push(['🚀','최고 속도 개인 기록 갱신',s.vmaxKmh.toFixed(1)+'km/h']);
     if((s.distM||0)>Math.max(...P.map(d=>d.s.distM||0)))B.push(['📈','하루 거리 개인 기록 갱신',km(s.distM)])}
@@ -1008,6 +1018,8 @@ async function loadClaims(id){
 async function start(){
   ST.conf=readConf();ST.me=loadMe();
   ST.linkAdmin=!!load('jogi-sync');   // 기존 연결 링크(축구회 코드)로 연결된 운영진 휴대폰
+  ST.adminDoor=/[?&]admin(=|&|$)/.test(location.search);   // 운영진 단톡방용 주소(member.html?admin)
+  titleDoor();
   render();if(!ST.conf)return initAuth(null);
   try{
     const A=await import(`https://www.gstatic.com/firebasejs/${FBV}/firebase-app.js`);
@@ -1030,6 +1042,10 @@ async function start(){
     setInterval(()=>{if(ST.tab==='admin')render()},30000);
   }catch(e){ST.err='연결하지 못했어요. 인터넷 연결을 확인해 주세요.';render()}
 }
+// 숨은 입구: 제목 "벤치제로" 를 1.5초 길게 누르면 운영진 로그인 창
+function titleDoor(){const el=$('title');let tm=null;const stop=()=>{clearTimeout(tm);tm=null};
+  el.addEventListener('pointerdown',()=>{stop();tm=setTimeout(()=>{tm=null;ST.adminDoor=true;if(ST.user){ST.tab='admin';render()}else login()},1500)});
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>el.addEventListener(ev,stop));el.addEventListener('contextmenu',e=>e.preventDefault())}
 async function initAuth(app){
   try{
     const A=await import(`https://www.gstatic.com/firebasejs/${FBV}/firebase-auth.js`);
