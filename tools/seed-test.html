@@ -62,7 +62,10 @@ function quarter(date,q,startMs){
       avgKmh:+(dist/mins*0.06).toFixed(2),workRate:+(dist/mins).toFixed(1),hsrM:hsr,sprintM:sprM,accels:Math.round(8+rnd()*12),decels:Math.round(6+rnd()*12),
       speedSeries:sp,dist5:dist5.map(v=>Math.round(v)),sprintPaths:paths,
       thirds:{def:+col(0,4).toFixed(3),mid:+col(4,8).toFixed(3),att:+col(8,12).toFixed(3)},lanes:{l:+row(0,3).toFixed(3),c:+row(3,5).toFixed(3),r:+row(5,8).toFixed(3)},ownHalf:+col(0,6).toFixed(3),
-      dirs:{fwd:+fw.toFixed(3),back:+bk.toFixed(3),side:+(1-fw-bk).toFixed(3)},nearMate:+(7+rnd()*12).toFixed(1)};
+      dirs:{fwd:+fw.toFixed(3),back:+bk.toFixed(3),side:+(1-fw-bk).toFixed(3)},nearMate:+(7+rnd()*12).toFixed(1),
+      // 세부 능력치용 새 필드: 방향 전환, 반복 스프린트, 상대 박스 진입, 수비 라인에서 벗어난 거리, 고속 거리 앞·뒤 절반
+      turns:Math.round(15+rnd()*25),rsa:sprints>=2?Math.floor(rnd()*sprints):0,boxEntries:Math.round(fx>0.55?2+rnd()*5:fx>0.35?rnd()*3:rnd()),lineDevM:+(2+rnd()*6).toFixed(1),
+      hsrHalves:(()=>{const a=Math.round(hsr*(0.5+rnd()*0.12));return [a,hsr-a]})()};
   }
   return {v:1,date,q,startMs,endMs:startMs+25*6e4,source:'benchzero',video:{yt:q===1?'https://youtu.be/aqz-KE-bpKQ':null,drive:q===2?'https://drive.google.com/':null,offsetSec:0},
     frame:{w:1280,h:720,jpg:frame(tracks)},tracks,stats,

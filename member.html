@@ -78,6 +78,8 @@ em.ref{font-style:normal;font-size:.68rem;font-weight:700;color:var(--mute);bord
 .fc-av{width:6.2rem;height:6.2rem;margin:.6rem auto .3rem;border-radius:50%;background:#ffffff59;border:2px solid #ffffff99;display:grid;place-items:center;font-size:1.7rem;font-weight:900}
 .fc-name{font-size:1.35rem;font-weight:900;padding-bottom:.35rem;border-bottom:1.5px solid currentColor;margin:0 .6rem .5rem}
 .fc-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem .2rem;margin:0 .2rem}.fc-stats div{display:flex;align-items:baseline;justify-content:center;gap:.25rem}.fc-stats b{font-size:1.3rem;font-weight:900}.fc-stats span{font-size:.78rem;font-weight:800;white-space:nowrap}.fc-stats sup{font-size:.55rem;opacity:.75;margin-left:.1rem}
+.fc-stats button{all:unset;cursor:pointer;display:flex;align-items:baseline;justify-content:center;gap:.25rem;border-radius:.4rem;padding:.1rem 0}.fc-stats button.on{background:#ffffff66;box-shadow:inset 0 0 0 1.5px currentColor}.fc-stats button:focus-visible{outline:2px solid currentColor}
+.subs{margin:.3rem 0 .2rem;padding:.6rem .7rem;background:var(--bg);border-radius:.75rem}.subs>p{margin:0 0 .3rem}.sr{display:flex;align-items:center;gap:.5rem;padding:.35rem 0;border-top:1px solid var(--line)}.sr>div:first-child{flex:0 0 8.2rem;display:flex;flex-direction:column;line-height:1.25}.sr small{color:var(--mute);font-size:.72rem}.sb2{flex:1;height:.55rem;background:var(--line);border-radius:.3rem;overflow:hidden}.sb2 i{display:block;height:100%}.sr em{font-style:normal;font-weight:900;width:1.8rem;text-align:right}
 .fc-foot{font-size:.75rem;font-weight:700;margin-top:.5rem;opacity:.8}
 .axh summary{cursor:pointer;color:var(--mute);font-size:.85rem}
 .seg{display:flex;gap:.3rem;margin-bottom:.6rem}.seg button{flex:1;min-height:2.3rem;font-size:.85rem;padding:0 .3rem}.seg button.on{background:var(--deep);color:#fff;border-color:var(--deep)}
@@ -153,13 +155,14 @@ function mergeStats(L){
   L=L.filter(Boolean);if(!L.length)return null;
   if(L.length===1){const s=fillStat(L[0]);s._segs=s.speedSeries?[s.speedSeries.length]:[];s._d5=s.dist5&&s.dist5.length?[s.dist5]:[];s._d5m=s._d5.length?[s.mins]:[];return s}
   const r={},has=k=>L.some(s=>nz(s[k]));
-  ['mins','distM','sprints','hsrM','sprintM','accels','decels'].forEach(k=>{if(has(k))r[k]=L.reduce((t,s)=>t+(s[k]||0),0)});
+  ['mins','distM','sprints','hsrM','sprintM','accels','decels','turns','rsa','boxEntries'].forEach(k=>{if(has(k))r[k]=L.reduce((t,s)=>t+(s[k]||0),0)});
   const z=sumObj(L,'zones');if(z)r.zones=z;const zs=sumObj(L,'zoneSec');if(zs)r.zoneSec=zs;
   {const v=L.map(s=>s.vmaxKmh).filter(okV);r.vmaxKmh=v.length?Math.max(...v):null}
-  ['coverPct','devM','nearMate','ownHalf'].forEach(k=>{const v=wAvg(L,k);if(v!=null)r[k]=v});
+  ['coverPct','devM','nearMate','ownHalf','lineDevM'].forEach(k=>{const v=wAvg(L,k);if(v!=null)r[k]=v});
   ['thirds','lanes','dirs','v2'].forEach(k=>{const v=wObj(L,k);if(v)r[k]=v});
   if(has('hiRatio')){const d=L.reduce((t,s)=>t+(s.distM||0),0);r.hiRatio=d?L.reduce((t,s)=>t+(s.hiRatio||0)*(s.distM||0),0)/d:0}
   const ss=L.filter(s=>s.speedSeries&&s.speedSeries.length);r.speedSeries=ss.length?[].concat(...ss.map(s=>s.speedSeries)):null;r._segs=ss.map(s=>s.speedSeries.length);
+  {const H=L.filter(s=>Array.isArray(s.hsrHalves));if(H.length)r.hsrHalves=[H.reduce((t,s)=>t+(s.hsrHalves[0]||0),0),H.reduce((t,s)=>t+(s.hsrHalves[1]||0),0)]}
   r._d5=L.filter(s=>s.dist5&&s.dist5.length).map(s=>s.dist5);r._d5m=L.filter(s=>s.dist5&&s.dist5.length).map(s=>s.mins);
   r.sprintPaths=[].concat(...L.map(s=>s.sprintPaths||[]));
   const hs=L.filter(s=>s.heat&&s.heat.length===96);if(hs.length){const h=new Array(96).fill(0);hs.forEach(s=>s.heat.forEach((v,i)=>h[i]+=v*(s.mins||1)));const mx=Math.max(...h,1e-9);r.heat=h.map(v=>v/mx)}
@@ -359,23 +362,49 @@ function dayStats(pid){const m={};allRows().filter(r=>r.pid===pid).forEach(r=>{(
 // 카드 버전. 1 = 지금 잴 수 있는 항목(위치·속도 기반). 분석기가 공 추적 뒤 stats.v2 = {pac,sho,pas,dri,def,phy} 를 넣으면 자동으로 2를 쓴다
 const CARD_V=1;
 const perMin=(s,v)=>nz(v)&&s.mins?v/s.mins:null;
-// 능력치 표: 키, 화면 이름(두세 글자), 계산 함수 목록(여러 개면 각각의 백분위를 평균), 참고 표시 여부. 값은 클수록 좋게 맞춘다
+const perQ=(s,v)=>nz(v)&&s.mins?v/s.mins*25:null;   // 쿼터(25분)당으로 환산
+const neg=v=>nz(v)?-v:null;                           // 작을수록 좋은 값은 - 를 붙여 클수록 좋게
+// 능력치 표: 큰 능력치(키, 화면 이름) 아래 세부 능력치(키, 이름, 설명, 계산 함수, 참고 표시, 보이는 포지션).
+// 세부 점수 = 축구회 백분위 → 45~99, 큰 능력치 = 보이는 세부 점수의 평균. 값이 없는 세부 항목은 숨기고 나머지로 평균한다
 const CARD_AX={
   1:[
-    {k:'pac',n:'속도',ref:true,parts:[s=>s.vmaxKmh,s=>perMin(s,s.accels)]},                     // 최고 속도·가속 (카메라 순간 값이라 참고)
-    {k:'phy',n:'피지컬',parts:[s=>s._games?s.distM/s._games:null,s=>nz(s.accels)?perMin(s,(s.accels||0)+(s.decels||0)):null]}, // 경기당 운동량 + 가속·감속 강도
-    {k:'wr',n:'활동량',parts:[s=>s.workRate]},                                                    // 분당 거리
-    {k:'hi',n:'고강도',parts:[s=>nz(s.hsrM)?perMin(s,(s.hsrM||0)+(s.sprintM||0)):null]},           // 고속(20+)·전력 질주(25+) 거리
-    {k:'sta',n:'체력',parts:[s=>s._end]},                                                         // 5분 구간 거리 유지율
-    {k:'pos',n:'위치',parts:[s=>nz(s.devM)?-s.devM:null]}],                                       // 작전판 자리 지키기(벗어난 거리가 작을수록)
-  // v2(공 추적 뒤): 분석기가 stats.v2 에 원값이나 0~99 점수를 넣는다. 여기서도 축구회 백분위로 바꾼다
+    {k:'pac',n:'속도',subs:[
+      {k:'acc',n:'가속력',d:'쿼터당 가속 횟수',ref:true,f:s=>perQ(s,s.accels)},
+      {k:'top',n:'최고 속도',d:'가장 빨랐던 순간 속도',ref:true,f:s=>s.vmaxKmh},
+      {k:'spf',n:'스프린트 빈도',d:'쿼터당 스프린트(시속 25km 이상 1초 이상)',f:s=>perQ(s,s.sprints)}]},
+    {k:'phy',n:'피지컬',subs:[
+      {k:'vol',n:'운동량',d:'경기당 뛴 거리',f:s=>s._games?s.distM/s._games:null},
+      {k:'int',n:'강도',d:'분당 거리',f:s=>s.workRate},
+      {k:'brk',n:'제동',d:'쿼터당 감속 횟수',ref:true,f:s=>perQ(s,s.decels)}]},
+    {k:'wr',n:'활동량',subs:[
+      {k:'mpm',n:'분당 거리',d:'1분에 뛴 거리',f:s=>s.workRate},
+      {k:'cov',n:'활동 범위',d:'운동장에서 움직인 넓이',f:s=>s.coverPct},
+      {k:'agi',n:'민첩성',d:'쿼터당 방향 전환 횟수',f:s=>perQ(s,s.turns)}]},
+    {k:'hi',n:'고강도',subs:[
+      {k:'hsr',n:'고속 거리',d:'쿼터당 시속 20km 이상 거리',f:s=>perQ(s,s.hsrM)},
+      {k:'spr',n:'전력 거리',d:'쿼터당 시속 25km 이상 거리',f:s=>perQ(s,s.sprintM)},
+      {k:'rsa',n:'반복 스프린트',d:'쿼터당 짧은 간격으로 이어진 스프린트',f:s=>perQ(s,s.rsa)}]},
+    {k:'sta',n:'체력',subs:[
+      {k:'stm',n:'스태미나',d:'쿼터 뒤 절반 거리 ÷ 앞 절반 거리',f:s=>s._end},
+      {k:'hhk',n:'후반 고강도 유지',d:'쿼터 뒤 절반 고속 거리 ÷ 앞 절반',f:s=>s._hh}]},
+    {k:'pos',n:'위치',subs:[
+      {k:'dpo',n:'수비 위치 선정',d:'작전판 자리에서 벗어난 거리(작을수록)',only:['DF','MF'],f:s=>neg(s.devM)},
+      {k:'lin',n:'라인 맞추기',d:'수비 라인에서 벗어난 거리(작을수록)',only:['DF'],f:s=>neg(s.lineDevM)},
+      {k:'apo',n:'공격 위치 선정',d:'쿼터당 상대 페널티 박스 진입',only:['MF','FW'],f:s=>perQ(s,s.boxEntries)},
+      {k:'gap',n:'대형 간격',d:'가장 가까운 동료와 거리(10~18m 적정)',f:s=>nz(s.nearMate)?-(s.nearMate<10?10-s.nearMate:s.nearMate>18?s.nearMate-18:0):null}]}],
+  // v2(공 추적 뒤): 분석기가 stats.v2 에 원값이나 0~99 점수를 넣는다. 여기서도 축구회 백분위로 바꾼다.
+  // 세부 항목 자리(분석기가 v2 에 같은 키로 넣으면 subs 에 추가):
+  //   슛: 슈팅 횟수(shots), 유효 슈팅 비율(onTgt), 득점(goals)
+  //   패스: 패스 성공률(passPct), 전진 패스(progPass), 시야·키 패스(keyPass)
+  //   드리블: 볼 컨트롤(touchCtl), 드리블 성공(dribOk), 볼 운반 거리(carryM)
+  //   수비: 가로채기(intercept), 태클 성공(tackleOk), 볼 되찾기(recover)
   2:[
-    {k:'pac',n:'속도',ref:true,parts:[s=>s.v2&&s.v2.pac]},
-    {k:'sho',n:'슛',parts:[s=>s.v2&&s.v2.sho]},
-    {k:'pas',n:'패스',parts:[s=>s.v2&&s.v2.pas]},
-    {k:'dri',n:'드리블',parts:[s=>s.v2&&s.v2.dri]},
-    {k:'def',n:'수비',parts:[s=>s.v2&&s.v2.def]},
-    {k:'phy',n:'피지컬',parts:[s=>s.v2&&s.v2.phy]}]
+    {k:'pac',n:'속도',subs:[{k:'v2pac',n:'속도',d:'공 추적 분석 점수',ref:true,f:s=>s.v2&&s.v2.pac}]},
+    {k:'sho',n:'슛',subs:[{k:'v2sho',n:'슛',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.sho}]},
+    {k:'pas',n:'패스',subs:[{k:'v2pas',n:'패스',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.pas}]},
+    {k:'dri',n:'드리블',subs:[{k:'v2dri',n:'드리블',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.dri}]},
+    {k:'def',n:'수비',subs:[{k:'v2def',n:'수비',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.def}]},
+    {k:'phy',n:'피지컬',subs:[{k:'v2phy',n:'피지컬',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.phy}]}]
 };
 // 포지션별 종합 점수 비중(합 100). 쉽게 바꿀 수 있게 여기 모아 둔다
 const OVR_W={
@@ -390,16 +419,20 @@ function seasonTable(){
   const m={};allRows().forEach(r=>{(m[r.pid]=m[r.pid]||[]).push(r)});
   return Object.entries(m).map(([pid,R])=>{const L=R.map(r=>r.s),s=mergeStats(L),en=L.map(x=>endur(mergeStats([x]))).filter(nz);
     s._games=new Set(R.map(r=>r.a.date)).size;s._end=en.length?mean(en):null;
+    // 후반 고강도 유지: 쿼터마다 hsrHalves[뒤]/[앞] 을 구해 평균(앞 절반이 0인 쿼터는 뺌)
+    const hh=L.map(x=>Array.isArray(x.hsrHalves)&&x.hsrHalves[0]>0?x.hsrHalves[1]/x.hsrHalves[0]:null).filter(nz);s._hh=hh.length?mean(hh):null;
     return {pid,s,n:L.length,P:pitchOf(R[R.length-1].a)}});
 }
 // 축구회 회원 분포에서의 백분위를 1~99 로
 function pctScore(v,arr){if(!nz(v))return null;const a=arr.filter(nz);if(a.length<2)return 50;let lo=0,eq=0;a.forEach(x=>{if(x<v)lo++;else if(x===v)eq++});return Math.round((lo+0.5*eq)/a.length*98)+1}
 function cardScores(T,me){
-  const ver=T.some(r=>r.s.v2&&Object.keys(r.s.v2).length)?2:CARD_V,AXS=CARD_AX[ver],sc={};
-  AXS.forEach(ax=>{const ps=ax.parts.map(f=>pctScore(f(me.s),T.map(r=>f(r.s)))).filter(nz);sc[ax.k]=ps.length?RATE(mean(ps)):null});
-  const g=posGroup(me.s,me.P),W=g?OVR_W[ver][g]:null;let t=0,w=0;
+  const ver=T.some(r=>r.s.v2&&Object.keys(r.s.v2).length)?2:CARD_V,AXS=CARD_AX[ver],sc={},sub={},g=posGroup(me.s,me.P);
+  // 세부 점수를 먼저 매기고, 큰 능력치는 보이는 세부 점수의 평균. 내 포지션에 해당 없는 항목과 값이 없는 항목은 숨긴다
+  AXS.forEach(ax=>{const L=[];ax.subs.forEach(su=>{if(su.only&&g&&!su.only.includes(g))return;const v=RATE(pctScore(su.f(me.s),T.map(r=>su.f(r.s))));if(nz(v))L.push(Object.assign({v},su))});
+    sub[ax.k]=L;sc[ax.k]=L.length?Math.round(mean(L.map(x=>x.v))):null});
+  const W=g?OVR_W[ver][g]:null;let t=0,w=0;
   AXS.forEach(ax=>{if(!nz(sc[ax.k]))return;const wi=W?(W[ax.k]||0):1;t+=sc[ax.k]*wi;w+=wi});
-  return {ver,AXS,sc,g,ovr:w?Math.round(t/w):null};
+  return {ver,AXS,sc,sub,g,ovr:w?Math.round(t/w):null};
 }
 function radarSvg(AXS,sc){
   const cx=150,cy=138,R=92,n=AXS.length,pt=(i,v)=>{const a=-Math.PI/2+i*2*Math.PI/n;return[+(cx+Math.cos(a)*R*v/99).toFixed(1),+(cy+Math.sin(a)*R*v/99).toFixed(1)]};
@@ -411,10 +444,13 @@ function radarSvg(AXS,sc){
 }
 function cardHtml(D){
   const T=seasonTable(),me=T.find(r=>r.pid===ST.me.pid);if(!me)return '';
-  const {ver,AXS,sc,g,ovr}=cardScores(T,me),s=me.s,tier=TIER.find(t=>(ovr||0)>=t[0]);
+  const {ver,AXS,sc,sub,g,ovr}=cardScores(T,me),s=me.s,tier=TIER.find(t=>(ovr||0)>=t[0]);
   // 비교 대상이 8명 미만이거나 내 출전이 3쿼터 미만이면 점수가 들쭉날쭉하므로 참고용으로만 보여 준다
   const few=T.length<8||me.n<3,W=g?OVR_W[ver][g]:null;
-  const st=AXS.map(ax=>`<div><b>${sc[ax.k]??'-'}</b><span>${ax.n}${ax.ref?'<sup>참고</sup>':''}</span></div>`).join('');
+  // 큰 능력치를 누르면 아래에 세부 능력치가 펼쳐진다
+  const st=AXS.map(ax=>`<button type="button" data-ax="${ax.k}" class="${ST.cardOpen===ax.k?'on':''}" aria-expanded="${ST.cardOpen===ax.k}"><b>${sc[ax.k]??'-'}</b><span>${ax.n}${ax.k==='pac'?'<sup>참고</sup>':''}</span></button>`).join('');
+  const oa=AXS.find(ax=>ax.k===ST.cardOpen),ol=oa?sub[oa.k]:null;
+  const detail=oa?`<div class="subs"><p><b>${oa.n} ${sc[oa.k]??'-'}</b> <span class="hint">세부 능력치 평균</span></p>${ol&&ol.length?ol.map(x=>`<div class="sr"><div><b>${x.n}${x.ref?REF:''}</b><small>${x.d}</small></div><div class="sb2"><i style="width:${x.v}%;background:${x.v>=75?'#d9b23a':x.v>=65?'#94a3b8':'#c47a3f'}"></i></div><em>${x.v}</em></div>`).join(''):'<p class="hint">아직 잴 수 있는 세부 항목이 없어요.</p>'}</div>`:'<p class="hint" style="text-align:center;margin:.2rem 0 0">카드의 능력치를 누르면 세부 능력치가 펼쳐져요.</p>';
   return `<div class="card">
     ${few?`<p class="few" style="margin:0 0 .6rem">아직 비교할 기록이 적어 참고용이에요 (비교 대상 ${T.length}명 · 내 출전 ${me.n}쿼터). 8명 이상, 3쿼터 이상 쌓이면 점수가 안정돼요.</p>`:''}
     <div class="fcard ${tier[1]}${few?' dim':''}" aria-label="${esc(ST.me.name)} 선수 카드, 종합 ${ovr??'-'}, ${tier[2]} 등급">
@@ -424,6 +460,7 @@ function cardHtml(D){
       <div class="fc-stats">${st}</div>
       <div class="fc-foot">${D.length}경기 · ${me.n}쿼터</div>
     </div>
+    ${detail}
     ${ver===1?'<p class="hint" style="text-align:center">공 추적이 되면 축구 게임 카드처럼 6개 능력치(속도·슛·패스·드리블·수비·피지컬)로 바뀌어요.</p>':''}
     <div class="kpi" style="margin-top:.6rem"><div><b>${km(s.distM)}</b><span>누적 거리</span></div><div><b>${nz(s.vmaxKmh)?s.vmaxKmh.toFixed(1):'-'}</b><span>최고 속도 km/h${REF}</span></div><div><b>${nz(s.workRate)?Math.round(s.workRate)+'m':'-'}</b><span>평균 분당 거리</span></div>
     <div><b>${nz(s.sprints)?s.sprints+'회':'-'}</b><span>누적 스프린트</span></div><div><b>${nz(s.hsrM)?km(s.hsrM):'-'}</b><span>누적 고속 거리</span></div><div><b>${s.mins?km(s.distM/s.mins*25):'-'}</b><span>쿼터당 거리(25분 환산)</span></div></div>
@@ -606,6 +643,7 @@ document.addEventListener('click',e=>{
   const tb=t.closest('[data-tab]');if(tb){ST.tab=tb.dataset.tab;ST.msg='';render();window.scrollTo(0,0);return}
   const p=t.closest('[data-pick]');if(p){const n=(ST.P.names||[]).find(x=>x.id===p.dataset.pick);if(n){ST.confirm=n;ST.msg='';render()}return}
   const sl=t.closest('[data-sel]');if(sl){ST.sel=sl.dataset.sel;ST.claimArm=null;ST.msg='';render();return}
+  const ax=t.closest('[data-ax]');if(ax){ST.cardOpen=ST.cardOpen===ax.dataset.ax?null:ax.dataset.ax;render();return}
   const rk=t.closest('[data-rank]');if(rk){ST.rank=rk.dataset.rank;render();return}
   const bx=t.closest('[data-tid]');if(bx){const a=curAna();if(!a)return;const o=ownerOf(a,bx.dataset.tid);
     if(o){say(o===ST.me.pid?'이 네모가 나예요.':`${nameOf(o)} 님으로 정해진 네모예요.`,o===ST.me.pid?'ok':'');return}
