@@ -38,9 +38,11 @@ function quarter(date,q,startMs){
     tracks.push({tid,team,box:[+(cx-w/2).toFixed(4),+(0.17+fy*0.72-h).toFixed(4),+w.toFixed(4),+h.toFixed(4)],pid,by:pid?'board':null});
     // 기준(분석기와 같음): 고속 거리 hsrM = 시속 20km 이상, 전력 질주 거리 sprintM = 시속 25km 이상,
     // 스프린트 sprints = 시속 25km 이상이 1초 이상 이어진 횟수. 조기축구 현실 범위로 서로 맞게 만든다
-    const mins=20+rnd()*5,N=Math.round(mins*6),base=5+rnd()*4,fat=0.05+rnd()*0.25;
-    const vmax=+(22+rnd()*7).toFixed(1),sprints=vmax>=25?2+Math.floor(rnd()*5):0;
-    const sprM=sprints?Math.round(Math.min(120,Math.max(40,sprints*(10+rnd()*10)))):0,hsr=Math.round(Math.min(300,Math.max(150,sprM+90+rnd()*120)));
+    // 선수(추적 순서)마다 실력 차이를 둔다: lv 0.7~1.15. 카드 금·은·동이 고르게 나오게
+    const lv=0.7+((i*37)%14)/13*0.45;
+    const mins=20+rnd()*5,N=Math.round(mins*6),base=(4.5+rnd()*3)*lv,fat=(0.05+rnd()*0.2)/lv;
+    const vmax=+Math.min(29,20+lv*6+rnd()*2.5).toFixed(1),sprints=vmax>=25?Math.max(1,Math.round((1+rnd()*4)*lv)):0;
+    const sprM=sprints?Math.round(Math.min(120,Math.max(40,sprints*(10+rnd()*10)))):0,hsr=Math.round(Math.min(300,Math.max(60,(sprM+60+rnd()*120)*lv*lv)));
     // 10초 평균 속도: 순간 최고 속도보다 낮게 나온다. 고속 구간이 들어간 10초는 12~19km/h 정도
     const sp=[];for(let k=0;k<N;k++){let v=base*(1-fat*k/N)+(rnd()-.5)*3;sp.push(Math.max(.5,v))}
     const nHi=Math.max(2,Math.round(hsr/45));for(let j=0;j<nHi;j++){const k=Math.floor(rnd()*N);sp[k]=12+rnd()*Math.min(7,vmax-15)}
@@ -50,7 +52,7 @@ function quarter(date,q,startMs){
     // 20km/h 이상 구간은 10초 평균으로는 안 보이므로 달리기 구간에서 떼어 고속 구간으로 옮긴다
     const hsSec=hsr/(22/3.6);z.run=Math.max(0,z.run-hsr);z.sprint=hsr;zs.run=Math.max(0,zs.run-hsSec);zs.sprint=Math.round(hsSec);
     const ax=fx*100,ay=fy*64,heat=[];for(let r=0;r<8;r++)for(let k=0;k<12;k++){const dx=(k+.5)/12*100-ax,dy=(r+.5)/8*64-ay;heat.push(+Math.exp(-(dx*dx/500+dy*dy/250)).toFixed(3))}
-    const board=[ax+(rnd()-.5)*16,ay+(rnd()-.5)*12];
+    const board=[ax+(rnd()-.5)*16/lv,ay+(rnd()-.5)*12/lv];
     // 히트맵에서 3등분·좌우·우리 진영 비율을 뽑는다
     const hs=heat.reduce((s,v)=>s+v,0)||1,col=(a,b)=>heat.reduce((s,v,i)=>s+((i%12)>=a&&(i%12)<b?v:0),0)/hs,row=(a,b)=>heat.reduce((s,v,i)=>s+(Math.floor(i/12)>=a&&Math.floor(i/12)<b?v:0),0)/hs;
     // 스프린트 경로: 한 번에 25km/h 이상으로 달린 거리 + 앞뒤 가속 구간(약 2배)
@@ -58,13 +60,13 @@ function quarter(date,q,startMs){
       const p=[];for(let j=0;j<4;j++)p.push(+Math.max(1,Math.min(99,sx+Math.cos(ang)*len*j/3)).toFixed(1),+Math.max(1,Math.min(63,sy+Math.sin(ang)*len*j/3+(j?(rnd()-.5)*2:0))).toFixed(1));paths.push({p})}
     const fw=.3+rnd()*.15,bk=.22+rnd()*.12;
     stats[tid]={mins:+mins.toFixed(1),distM:Math.round(dist),zones:Object.fromEntries(Object.entries(z).map(([k,v])=>[k,Math.round(v)])),zoneSec:Object.fromEntries(Object.entries(zs).map(([k,v])=>[k,Math.round(v)])),
-      sprints,hiRatio:+((z.run+z.sprint)/dist).toFixed(3),vmaxKmh:vmax,heat,avg:[+ax.toFixed(1),+ay.toFixed(1)],board:[+board[0].toFixed(1),+board[1].toFixed(1)],devM:+Math.hypot(board[0]-ax,board[1]-ay).toFixed(1),coverPct:+(15+rnd()*25).toFixed(1),
+      sprints,hiRatio:+((z.run+z.sprint)/dist).toFixed(3),vmaxKmh:vmax,heat,avg:[+ax.toFixed(1),+ay.toFixed(1)],board:[+board[0].toFixed(1),+board[1].toFixed(1)],devM:+Math.hypot(board[0]-ax,board[1]-ay).toFixed(1),coverPct:+((12+rnd()*20)*lv).toFixed(1),
       avgKmh:+(dist/mins*0.06).toFixed(2),workRate:+(dist/mins).toFixed(1),hsrM:hsr,sprintM:sprM,accels:Math.round(8+rnd()*12),decels:Math.round(6+rnd()*12),
       speedSeries:sp,dist5:dist5.map(v=>Math.round(v)),sprintPaths:paths,
       thirds:{def:+col(0,4).toFixed(3),mid:+col(4,8).toFixed(3),att:+col(8,12).toFixed(3)},lanes:{l:+row(0,3).toFixed(3),c:+row(3,5).toFixed(3),r:+row(5,8).toFixed(3)},ownHalf:+col(0,6).toFixed(3),
-      dirs:{fwd:+fw.toFixed(3),back:+bk.toFixed(3),side:+(1-fw-bk).toFixed(3)},nearMate:+(7+rnd()*12).toFixed(1),
+      dirs:{fwd:+fw.toFixed(3),back:+bk.toFixed(3),side:+(1-fw-bk).toFixed(3)},nearMate:+(lv>0.9?10+rnd()*8:5+rnd()*18).toFixed(1),
       // 세부 능력치용 새 필드: 방향 전환, 반복 스프린트, 상대 박스 진입, 수비 라인에서 벗어난 거리, 고속 거리 앞·뒤 절반
-      turns:Math.round(15+rnd()*25),rsa:sprints>=2?Math.floor(rnd()*sprints):0,boxEntries:Math.round(fx>0.55?2+rnd()*5:fx>0.35?rnd()*3:rnd()),lineDevM:+(2+rnd()*6).toFixed(1),
+      turns:Math.round((12+rnd()*22)*lv),rsa:sprints>=2?Math.floor(rnd()*sprints):0,boxEntries:Math.round(fx>0.55?2+rnd()*5:fx>0.35?rnd()*3:rnd()),lineDevM:+((2+rnd()*5)/lv).toFixed(1),
       hsrHalves:(()=>{const a=Math.round(hsr*(0.5+rnd()*0.12));return [a,hsr-a]})()};
   }
   return {v:1,date,q,startMs,endMs:startMs+25*6e4,source:'benchzero',video:{yt:q===1?'https://youtu.be/aqz-KE-bpKQ':null,drive:q===2?'https://drive.google.com/':null,offsetSec:0},

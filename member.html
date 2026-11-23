@@ -81,6 +81,7 @@ em.ref{font-style:normal;font-size:.68rem;font-weight:700;color:var(--mute);bord
 .fc-stats button{all:unset;cursor:pointer;display:flex;align-items:baseline;justify-content:center;gap:.25rem;border-radius:.4rem;padding:.1rem 0}.fc-stats button.on{background:#ffffff66;box-shadow:inset 0 0 0 1.5px currentColor}.fc-stats button:focus-visible{outline:2px solid currentColor}
 .subs{margin:.3rem 0 .2rem;padding:.6rem .7rem;background:var(--bg);border-radius:.75rem}.subs>p{margin:0 0 .3rem}.sr{display:flex;align-items:center;gap:.5rem;padding:.35rem 0;border-top:1px solid var(--line)}.sr>div:first-child{flex:0 0 8.2rem;display:flex;flex-direction:column;line-height:1.25}.sr small{color:var(--mute);font-size:.72rem}.sb2{flex:1;height:.55rem;background:var(--line);border-radius:.3rem;overflow:hidden}.sb2 i{display:block;height:100%}.sr em{font-style:normal;font-weight:900;width:1.8rem;text-align:right}
 .fc-foot{font-size:.75rem;font-weight:700;margin-top:.5rem;opacity:.8}
+.pb{list-style:none;margin:0;padding:0}.pb li{display:flex;align-items:baseline;gap:.5rem;padding:.35rem 0;border-bottom:1px solid var(--line);font-size:.9rem}.pb li span{flex:1}.pb li small{color:var(--mute);font-size:.75rem;width:4.2rem;text-align:right}
 .axh summary{cursor:pointer;color:var(--mute);font-size:.85rem}
 .seg{display:flex;gap:.3rem;margin-bottom:.6rem}.seg button{flex:1;min-height:2.3rem;font-size:.85rem;padding:0 .3rem}.seg button.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 </style>
@@ -175,7 +176,7 @@ function allRows(){const out=[];sortedAna().forEach(a=>{const seen=new Set();(a.
 
 // ---------- 화면 ----------
 function tabsHtml(){
-  const T=[['game','경기'],['mine','내 기록'],['rank','순위']];if(ST.admin||ST.linkAdmin)T.push(['admin','관리']);
+  const T=[['game','경기'],['mine','내 카드'],['rank','순위']];if(ST.admin||ST.linkAdmin)T.push(['admin','관리']);
   return T.map(([k,l])=>`<button data-tab="${k}" class="${ST.tab===k?'on':''}">${l}</button>`).join('');
 }
 function render(){
@@ -217,10 +218,16 @@ function gameHtml(){
   const sel=`<select data-date>${D.map(d=>`<option value="${d}" ${d===a.date?'selected':''}>${dLabel(d)} 경기</option>`).join('')}</select>`;
   const qb=`<div class="qs" style="margin-top:.5rem">${qs.map(x=>`<button data-sel="${esc(x.id)}" class="${x.id===a.id?'on':''}">${x.q}쿼터${tidsOf(x,ST.me.pid).length?' ✓':''}</button>`).join('')}</div>`;
   const s=statOf(a,ST.me.pid);
+  // 내 경기 분석: 이 쿼터 / 그날 합계를 버튼으로 바꿔 본다
+  const MD=dayStats(ST.me.pid),dd=MD.find(x=>x.date===a.date),gv=ST.gview==='d'&&dd?'d':'q';
+  const seg=dd?`<div class="seg"><button data-gview="q" class="${gv==='q'?'on':''}">${a.q}쿼터</button><button data-gview="d" class="${gv==='d'?'on':''}">그날 합계 · ${dd.q}쿼터</button></div>`:'';
+  const body=gv==='d'?`<p class="hint" style="margin:0 0 .5rem">${dLabel(a.date)}에 뛴 쿼터를 모두 합친 기록이에요.</p>`+reportHtml(dd.s,dd.P,'d'+dd.date)
+    :s?reportHtml(s,pitchOf(a),'q'+a.id):`<p class="hint">이 쿼터에서 아직 내가 누구인지 몰라요. 위 <b>나 찾기</b>에서 내 네모를 눌러 주세요.</p>`;
   return `<div class="card">${sel}${qb}</div>
   <div class="card"><h2>${a.q}쿼터 영상 <span class="hint">${a.startMs?hm(a.startMs)+(a.endMs?'~'+hm(a.endMs):''):''}</span></h2>${videoHtml(a)}</div>
   <div class="card"><h2>나 찾기</h2>${findHtml(a)}</div>
-  <div class="card"><h2>내 경기 분석 · ${a.q}쿼터</h2>${s?reportHtml(s,pitchOf(a),'q'+a.id)+cmpHtml(scopeRows('q',a.id),ST.me.pid,pitchOf(a),'이 쿼터'):`<p class="hint">이 쿼터에서 아직 내가 누구인지 몰라요. 위 <b>나 찾기</b>에서 내 네모를 눌러 주세요.</p>`}</div>
+  <div class="card"><h2>내 경기 분석</h2>${seg}${body}<p class="hint">다른 회원과의 비교는 순위 탭에서 볼 수 있어요.</p></div>
+  ${gameCmpHtml(MD,a.date)}
   ${teamHtml(a)}`;
 }
 function ytId(u){if(!u)return null;const m=String(u).match(/(?:youtu\.be\/|v=|embed\/|shorts\/|live\/)([\w-]{11})/);return m?m[1]:(/^[\w-]{11}$/.test(u)?u:null)}
@@ -354,18 +361,53 @@ function cmpHtml(rows,pid,P,title){
   return `<h3>비교 · ${esc(title)}</h3><table><tr><th>항목</th><th>나</th><th>${g?PGN[g]:'포지션'} 평균</th><th>축구회 평균</th></tr>${rowsH}</table>
   <p class="hint">${g?`같은 포지션(${PGN[g]}) ${same.length}명, `:''}축구회 ${others.length}명과 비교 · 초록은 평균보다 5% 이상 높음, 빨강은 낮음. 포지션은 작전판 자리(없으면 평균 위치)로 나눴어요.</p>`;
 }
-// ---------- 내 기록 탭: 선수 카드(능력치), 배지, 경기 리포트, 시즌 추이, 지난 경기, 부하 관리 ----------
+// ---------- 날짜 도우미 ----------
+const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const addDays=(ds,n)=>{const d=new Date(ds+'T12:00');d.setDate(d.getDate()+n);return ymd(d)};
+// 오늘 날짜. 시험 모드에서는 시험 데이터 마지막 날의 다음 날을 오늘로 본다(미리보기에서 카드가 비지 않게)
+function todayStr(){if(ST.test){const D=dates();if(D.length)return addDays(D[0],1)}return ymd(new Date())}
+const nowMs=()=>ST.test?Date.parse(todayStr()+'T09:00'):Date.now();
 // 내 날짜별 기록(그날 쿼터를 합친 값)
 function dayStats(pid){const m={};allRows().filter(r=>r.pid===pid).forEach(r=>{(m[r.a.date]=m[r.a.date]||[]).push(r)});
   return Object.keys(m).sort().map(d=>({date:d,q:m[d].length,s:mergeStats(m[d].map(r=>r.s)),P:pitchOf(m[d][0].a)}))}
+
 // ---------- 선수 카드 ----------
 // 카드 버전. 1 = 지금 잴 수 있는 항목(위치·속도 기반). 분석기가 공 추적 뒤 stats.v2 = {pac,sho,pas,dri,def,phy} 를 넣으면 자동으로 2를 쓴다
 const CARD_V=1;
-const perMin=(s,v)=>nz(v)&&s.mins?v/s.mins:null;
+const CARD_DAYS=30;                                   // 카드는 최근 30일 경기로 계산(오늘 경기는 다음 날부터 반영)
 const perQ=(s,v)=>nz(v)&&s.mins?v/s.mins*25:null;   // 쿼터(25분)당으로 환산
-const neg=v=>nz(v)?-v:null;                           // 작을수록 좋은 값은 - 를 붙여 클수록 좋게
-// 능력치 표: 큰 능력치(키, 화면 이름) 아래 세부 능력치(키, 이름, 설명, 계산 함수, 참고 표시, 보이는 포지션).
-// 세부 점수 = 축구회 백분위 → 45~99, 큰 능력치 = 보이는 세부 점수의 평균. 값이 없는 세부 항목은 숨기고 나머지로 평균한다
+// 절대 점수 기준표(조기축구 기준): [값, 점수] 점들을 직선으로 잇고 30~99로 자른다. 작을수록 좋은 항목은 점수가 내려가게 적는다.
+// 다른 회원 기록과 상관없이 내 기록만으로 점수가 정해진다.
+// 아마추어 일반 수치로 시작, 우리 축구회 기록이 쌓이면 다시 맞춤. 쿼터 값은 25분 기준으로 환산한 값
+const ABS_REF={
+  mpm:[[60,40],[80,60],[100,80],[115,92]],          // 분당 거리 m/min
+  top:[[20,40],[25,65],[28,80],[31,92]],            // 최고 속도 km/h
+  hsr:[[50,40],[150,65],[300,85],[450,95]],         // 고속 거리(시속 20km 이상) m/쿼터
+  spr:[[0,35],[40,60],[120,85]],                    // 전력 질주 거리(시속 25km 이상) m/쿼터
+  spf:[[0,35],[2,60],[5,82],[8,95]],                // 스프린트 회/쿼터
+  acc:[[3,40],[10,65],[20,88]],                     // 가속 회/쿼터
+  brk:[[3,40],[10,65],[20,88]],                     // 감속(제동) 회/쿼터
+  vol:[[1500,40],[2200,65],[2800,85],[3200,95]],    // 운동량 m/쿼터
+  stm:[[0.7,40],[0.85,65],[0.95,85],[1.0,92]],      // 스태미나: 쿼터 뒤 절반 거리 ÷ 앞 절반
+  hhk:[[0.5,40],[0.7,60],[0.9,80],[1.0,88]],        // 후반 고강도 유지: 뒤 절반 고속 거리 ÷ 앞 절반
+  dpo:[[15,40],[8,70],[4,90]],                      // 작전판 자리에서 벗어난 거리 m(작을수록)
+  lin:[[8,40],[4,70],[2,90]],                       // 수비 라인에서 벗어난 거리 m(작을수록)
+  cov:[[10,40],[20,60],[30,78],[40,90]],            // 활동 범위 %
+  agi:[[10,40],[20,60],[30,78],[45,92]],            // 방향 전환 회/쿼터
+  rsa:[[0,45],[1,62],[3,80],[5,92]],                // 반복 스프린트 회/쿼터
+  apo:[[0,40],[1,55],[3,75],[6,92]],                // 상대 페널티 박스 진입 회/쿼터
+  gap:[[0,85],[3,65],[6,45],[10,30]],               // 적정 동료 간격(10~18m)에서 벗어난 m
+  v2:[[0,0],[99,99]]                                // 공 추적 점수(분석기가 0~99로 줌)
+};
+// 기준표로 점수 매기기: 양 끝 바깥은 가장 가까운 구간의 기울기로 늘린 뒤 30~99로 자른다
+function absScore(ref,v){
+  if(!nz(v)||!ref)return null;const P=ref.slice().sort((a,b)=>a[0]-b[0]);let i=0;
+  while(i<P.length-2&&v>P[i+1][0])i++;
+  const[x0,y0]=P[i],[x1,y1]=P[i+1],y=y0+(y1-y0)*(v-x0)/((x1-x0)||1);
+  return Math.round(Math.max(30,Math.min(99,y)));
+}
+// 능력치 표: 큰 능력치 아래 세부 능력치(키, 이름, 설명, 기준표, 값 계산, 참고 표시, 보이는 포지션).
+// 큰 능력치 = 보이는 세부 점수의 평균. 값이 없거나 내 포지션에 해당 없는 세부 항목은 숨긴다
 const CARD_AX={
   1:[
     {k:'pac',n:'속도',subs:[
@@ -373,12 +415,12 @@ const CARD_AX={
       {k:'top',n:'최고 속도',d:'가장 빨랐던 순간 속도',ref:true,f:s=>s.vmaxKmh},
       {k:'spf',n:'스프린트 빈도',d:'쿼터당 스프린트(시속 25km 이상 1초 이상)',f:s=>perQ(s,s.sprints)}]},
     {k:'phy',n:'피지컬',subs:[
-      {k:'vol',n:'운동량',d:'경기당 뛴 거리',f:s=>s._games?s.distM/s._games:null},
-      {k:'int',n:'강도',d:'분당 거리',f:s=>s.workRate},
+      {k:'vol',n:'운동량',d:'쿼터당 뛴 거리',f:s=>perQ(s,s.distM)},
+      {k:'int',ab:'mpm',n:'강도',d:'분당 거리',f:s=>s.workRate},
       {k:'brk',n:'제동',d:'쿼터당 감속 횟수',ref:true,f:s=>perQ(s,s.decels)}]},
     {k:'wr',n:'활동량',subs:[
       {k:'mpm',n:'분당 거리',d:'1분에 뛴 거리',f:s=>s.workRate},
-      {k:'cov',n:'활동 범위',d:'운동장에서 움직인 넓이',f:s=>s.coverPct},
+      {k:'cov',n:'활동 범위',d:'운동장에서 움직인 넓이(%)',f:s=>nz(s.coverPct)?(s.coverPct<=1?s.coverPct*100:s.coverPct):null},
       {k:'agi',n:'민첩성',d:'쿼터당 방향 전환 횟수',f:s=>perQ(s,s.turns)}]},
     {k:'hi',n:'고강도',subs:[
       {k:'hsr',n:'고속 거리',d:'쿼터당 시속 20km 이상 거리',f:s=>perQ(s,s.hsrM)},
@@ -388,23 +430,23 @@ const CARD_AX={
       {k:'stm',n:'스태미나',d:'쿼터 뒤 절반 거리 ÷ 앞 절반 거리',f:s=>s._end},
       {k:'hhk',n:'후반 고강도 유지',d:'쿼터 뒤 절반 고속 거리 ÷ 앞 절반',f:s=>s._hh}]},
     {k:'pos',n:'위치',subs:[
-      {k:'dpo',n:'수비 위치 선정',d:'작전판 자리에서 벗어난 거리(작을수록)',only:['DF','MF'],f:s=>neg(s.devM)},
-      {k:'lin',n:'라인 맞추기',d:'수비 라인에서 벗어난 거리(작을수록)',only:['DF'],f:s=>neg(s.lineDevM)},
+      {k:'dpo',n:'수비 위치 선정',d:'작전판 자리에서 벗어난 거리(작을수록)',only:['DF','MF'],f:s=>s.devM},
+      {k:'lin',n:'라인 맞추기',d:'수비 라인에서 벗어난 거리(작을수록)',only:['DF'],f:s=>s.lineDevM},
       {k:'apo',n:'공격 위치 선정',d:'쿼터당 상대 페널티 박스 진입',only:['MF','FW'],f:s=>perQ(s,s.boxEntries)},
-      {k:'gap',n:'대형 간격',d:'가장 가까운 동료와 거리(10~18m 적정)',f:s=>nz(s.nearMate)?-(s.nearMate<10?10-s.nearMate:s.nearMate>18?s.nearMate-18:0):null}]}],
-  // v2(공 추적 뒤): 분석기가 stats.v2 에 원값이나 0~99 점수를 넣는다. 여기서도 축구회 백분위로 바꾼다.
-  // 세부 항목 자리(분석기가 v2 에 같은 키로 넣으면 subs 에 추가):
+      {k:'gap',n:'대형 간격',d:'가장 가까운 동료와 거리(10~18m 적정)',f:s=>nz(s.nearMate)?(s.nearMate<10?10-s.nearMate:s.nearMate>18?s.nearMate-18:0):null}]}],
+  // v2(공 추적 뒤): 분석기가 stats.v2 에 0~99 점수를 넣는다(기준표 v2 로 그대로 씀).
+  // 세부 항목 자리(분석기가 v2 에 같은 키로 넣으면 subs 에 추가하고 ABS_REF 에 기준표를 더함):
   //   슛: 슈팅 횟수(shots), 유효 슈팅 비율(onTgt), 득점(goals)
   //   패스: 패스 성공률(passPct), 전진 패스(progPass), 시야·키 패스(keyPass)
   //   드리블: 볼 컨트롤(touchCtl), 드리블 성공(dribOk), 볼 운반 거리(carryM)
   //   수비: 가로채기(intercept), 태클 성공(tackleOk), 볼 되찾기(recover)
   2:[
-    {k:'pac',n:'속도',subs:[{k:'v2pac',n:'속도',d:'공 추적 분석 점수',ref:true,f:s=>s.v2&&s.v2.pac}]},
-    {k:'sho',n:'슛',subs:[{k:'v2sho',n:'슛',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.sho}]},
-    {k:'pas',n:'패스',subs:[{k:'v2pas',n:'패스',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.pas}]},
-    {k:'dri',n:'드리블',subs:[{k:'v2dri',n:'드리블',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.dri}]},
-    {k:'def',n:'수비',subs:[{k:'v2def',n:'수비',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.def}]},
-    {k:'phy',n:'피지컬',subs:[{k:'v2phy',n:'피지컬',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.phy}]}]
+    {k:'pac',n:'속도',subs:[{k:'v2pac',ab:'v2',n:'속도',d:'공 추적 분석 점수',ref:true,f:s=>s.v2&&s.v2.pac}]},
+    {k:'sho',n:'슛',subs:[{k:'v2sho',ab:'v2',n:'슛',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.sho}]},
+    {k:'pas',n:'패스',subs:[{k:'v2pas',ab:'v2',n:'패스',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.pas}]},
+    {k:'dri',n:'드리블',subs:[{k:'v2dri',ab:'v2',n:'드리블',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.dri}]},
+    {k:'def',n:'수비',subs:[{k:'v2def',ab:'v2',n:'수비',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.def}]},
+    {k:'phy',n:'피지컬',subs:[{k:'v2phy',ab:'v2',n:'피지컬',d:'공 추적 분석 점수',f:s=>s.v2&&s.v2.phy}]}]
 };
 // 포지션별 종합 점수 비중(합 100). 쉽게 바꿀 수 있게 여기 모아 둔다
 const OVR_W={
@@ -413,26 +455,21 @@ const OVR_W={
 };
 // 카드 등급(종합 점수 기준)
 const TIER=[[75,'gold','금'],[65,'silver','은'],[0,'bronze','동']];
-// 백분위(1~99)를 카드 점수로 바꾼다. 축구회 중간이 약 72(은), 맨 위가 99, 맨 아래가 45 근처
-const RATE=p=>nz(p)?Math.round(45+p*0.54):null;
-function seasonTable(){
-  const m={};allRows().forEach(r=>{(m[r.pid]=m[r.pid]||[]).push(r)});
-  return Object.entries(m).map(([pid,R])=>{const L=R.map(r=>r.s),s=mergeStats(L),en=L.map(x=>endur(mergeStats([x]))).filter(nz);
-    s._games=new Set(R.map(r=>r.a.date)).size;s._end=en.length?mean(en):null;
-    // 후반 고강도 유지: 쿼터마다 hsrHalves[뒤]/[앞] 을 구해 평균(앞 절반이 0인 쿼터는 뺌)
-    const hh=L.map(x=>Array.isArray(x.hsrHalves)&&x.hsrHalves[0]>0?x.hsrHalves[1]/x.hsrHalves[0]:null).filter(nz);s._hh=hh.length?mean(hh):null;
-    return {pid,s,n:L.length,P:pitchOf(R[R.length-1].a)}});
-}
-// 축구회 회원 분포에서의 백분위를 1~99 로
-function pctScore(v,arr){if(!nz(v))return null;const a=arr.filter(nz);if(a.length<2)return 50;let lo=0,eq=0;a.forEach(x=>{if(x<v)lo++;else if(x===v)eq++});return Math.round((lo+0.5*eq)/a.length*98)+1}
-function cardScores(T,me){
-  const ver=T.some(r=>r.s.v2&&Object.keys(r.s.v2).length)?2:CARD_V,AXS=CARD_AX[ver],sc={},sub={},g=posGroup(me.s,me.P);
-  // 세부 점수를 먼저 매기고, 큰 능력치는 보이는 세부 점수의 평균. 내 포지션에 해당 없는 항목과 값이 없는 항목은 숨긴다
-  AXS.forEach(ax=>{const L=[];ax.subs.forEach(su=>{if(su.only&&g&&!su.only.includes(g))return;const v=RATE(pctScore(su.f(me.s),T.map(r=>su.f(r.s))));if(nz(v))L.push(Object.assign({v},su))});
-    sub[ax.k]=L;sc[ax.k]=L.length?Math.round(mean(L.map(x=>x.v))):null});
+// asOf 날짜 기준 최근 30일(asOf 당일은 빼고) 내 기록으로 카드를 계산
+function cardData(pid,asOf){
+  const from=addDays(asOf,-CARD_DAYS),R=allRows().filter(r=>r.pid===pid&&r.a.date>=from&&r.a.date<asOf);
+  if(!R.length)return null;
+  const L=R.map(r=>r.s),s=mergeStats(L),en=L.map(x=>endur(mergeStats([x]))).filter(nz);
+  s._games=new Set(R.map(r=>r.a.date)).size;s._end=en.length?mean(en):null;
+  // 후반 고강도 유지: 쿼터마다 hsrHalves[뒤]/[앞] 을 구해 평균(앞 절반이 0인 쿼터는 뺌)
+  const hh=L.map(x=>Array.isArray(x.hsrHalves)&&x.hsrHalves[0]>0?x.hsrHalves[1]/x.hsrHalves[0]:null).filter(nz);s._hh=hh.length?mean(hh):null;
+  const ver=L.some(x=>x.v2&&Object.keys(x.v2).length)?2:CARD_V,AXS=CARD_AX[ver],g=posGroup(s,pitchOf(R[R.length-1].a)),sc={},sub={};
+  AXS.forEach(ax=>{const out=[];ax.subs.forEach(su=>{if(su.only&&g&&!su.only.includes(g))return;const v=absScore(ABS_REF[su.ab||su.k],su.f(s));if(nz(v))out.push(Object.assign({v},su))});
+    sub[ax.k]=out;sc[ax.k]=out.length?Math.round(mean(out.map(x=>x.v))):null});
   const W=g?OVR_W[ver][g]:null;let t=0,w=0;
   AXS.forEach(ax=>{if(!nz(sc[ax.k]))return;const wi=W?(W[ax.k]||0):1;t+=sc[ax.k]*wi;w+=wi});
-  return {ver,AXS,sc,sub,g,ovr:w?Math.round(t/w):null};
+  const ds=[...new Set(R.map(r=>r.a.date))].sort();
+  return {s,n:R.length,games:ds.length,from,to:addDays(asOf,-1),ver,AXS,sc,sub,g,W,ovr:w?Math.round(t/w):null};
 }
 function radarSvg(AXS,sc){
   const cx=150,cy=138,R=92,n=AXS.length,pt=(i,v)=>{const a=-Math.PI/2+i*2*Math.PI/n;return[+(cx+Math.cos(a)*R*v/99).toFixed(1),+(cy+Math.sin(a)*R*v/99).toFixed(1)]};
@@ -442,35 +479,47 @@ function radarSvg(AXS,sc){
   AXS.forEach((ax,i)=>{const[x,y]=pt(i,121);g+=`<text x="${x}" y="${y-4}" text-anchor="middle" font-size="12" fill="var(--ink)">${ax.n}</text><text x="${x}" y="${y+11}" text-anchor="middle" font-size="13" font-weight="800" fill="#16a34a">${sc[ax.k]??'-'}</text>`});
   return `<svg viewBox="0 0 300 280" style="width:100%;max-width:340px;display:block;margin:0 auto">${g}</svg>`;
 }
-function cardHtml(D){
-  const T=seasonTable(),me=T.find(r=>r.pid===ST.me.pid);if(!me)return '';
-  const {ver,AXS,sc,sub,g,ovr}=cardScores(T,me),s=me.s,tier=TIER.find(t=>(ovr||0)>=t[0]);
-  // 비교 대상이 8명 미만이거나 내 출전이 3쿼터 미만이면 점수가 들쭉날쭉하므로 참고용으로만 보여 준다
-  const few=T.length<8||me.n<3,W=g?OVR_W[ver][g]:null;
-  // 큰 능력치를 누르면 아래에 세부 능력치가 펼쳐진다
+const md=ds=>`${+ds.slice(5,7)}/${+ds.slice(8)}`;
+function cardHtml(){
+  const today=todayStr(),C=cardData(ST.me.pid,today);
+  if(!C)return `<div class="card"><h2>${esc(ST.me.name)} 님 선수 카드</h2><p class="hint">최근 ${CARD_DAYS}일(어제까지) 안에 분석된 내 경기가 없어요. 오늘 경기는 내일부터 카드에 반영돼요.</p></div>`;
+  const {ver,AXS,sc,sub,g,W,ovr}=C,tier=TIER.find(t=>(ovr||0)>=t[0]),P=cardData(ST.me.pid,addDays(today,-7));
+  const dv=P&&nz(P.ovr)&&nz(ovr)?ovr-P.ovr:null;
+  // 최근 1개월 출전이 3쿼터 미만이면 참고용
+  const few=C.n<3;
   const st=AXS.map(ax=>`<button type="button" data-ax="${ax.k}" class="${ST.cardOpen===ax.k?'on':''}" aria-expanded="${ST.cardOpen===ax.k}"><b>${sc[ax.k]??'-'}</b><span>${ax.n}${ax.k==='pac'?'<sup>참고</sup>':''}</span></button>`).join('');
   const oa=AXS.find(ax=>ax.k===ST.cardOpen),ol=oa?sub[oa.k]:null;
   const detail=oa?`<div class="subs"><p><b>${oa.n} ${sc[oa.k]??'-'}</b> <span class="hint">세부 능력치 평균</span></p>${ol&&ol.length?ol.map(x=>`<div class="sr"><div><b>${x.n}${x.ref?REF:''}</b><small>${x.d}</small></div><div class="sb2"><i style="width:${x.v}%;background:${x.v>=75?'#d9b23a':x.v>=65?'#94a3b8':'#c47a3f'}"></i></div><em>${x.v}</em></div>`).join(''):'<p class="hint">아직 잴 수 있는 세부 항목이 없어요.</p>'}</div>`:'<p class="hint" style="text-align:center;margin:.2rem 0 0">카드의 능력치를 누르면 세부 능력치가 펼쳐져요.</p>';
+  const dtxt=dv==null?'':dv>0?`<span class="up">지난주보다 ▲${dv}</span>`:dv<0?`<span class="dn">지난주보다 ▼${-dv}</span>`:'<span class="hint">지난주와 같음</span>';
   return `<div class="card">
-    ${few?`<p class="few" style="margin:0 0 .6rem">아직 비교할 기록이 적어 참고용이에요 (비교 대상 ${T.length}명 · 내 출전 ${me.n}쿼터). 8명 이상, 3쿼터 이상 쌓이면 점수가 안정돼요.</p>`:''}
+    ${few?`<p class="few" style="margin:0 0 .6rem">최근 1개월 출전이 ${C.n}쿼터라 참고용이에요. 3쿼터 이상이면 점수가 안정돼요.</p>`:''}
     <div class="fcard ${tier[1]}${few?' dim':''}" aria-label="${esc(ST.me.name)} 선수 카드, 종합 ${ovr??'-'}, ${tier[2]} 등급">
       <div class="fc-top"><b class="fc-ovr">${ovr??'-'}</b><span class="fc-pos">${g?PGN[g]:'-'}</span><span class="fc-tier">${tier[2]}</span></div>
       <div class="fc-av">${esc((ST.me.name||'?').slice(-2))}</div>
       <div class="fc-name">${esc(ST.me.name)}</div>
       <div class="fc-stats">${st}</div>
-      <div class="fc-foot">${D.length}경기 · ${me.n}쿼터</div>
+      <div class="fc-foot">${md(C.from)}~${md(C.to)} · ${C.games}경기 ${C.n}쿼터</div>
     </div>
+    <p style="text-align:center;margin:.1rem 0 .3rem;font-weight:800;font-size:.9rem">${dtxt}</p>
     ${detail}
     ${ver===1?'<p class="hint" style="text-align:center">공 추적이 되면 축구 게임 카드처럼 6개 능력치(속도·슛·패스·드리블·수비·피지컬)로 바뀌어요.</p>':''}
-    <div class="kpi" style="margin-top:.6rem"><div><b>${km(s.distM)}</b><span>누적 거리</span></div><div><b>${nz(s.vmaxKmh)?s.vmaxKmh.toFixed(1):'-'}</b><span>최고 속도 km/h${REF}</span></div><div><b>${nz(s.workRate)?Math.round(s.workRate)+'m':'-'}</b><span>평균 분당 거리</span></div>
-    <div><b>${nz(s.sprints)?s.sprints+'회':'-'}</b><span>누적 스프린트</span></div><div><b>${nz(s.hsrM)?km(s.hsrM):'-'}</b><span>누적 고속 거리</span></div><div><b>${s.mins?km(s.distM/s.mins*25):'-'}</b><span>쿼터당 거리(25분 환산)</span></div></div>
     <details class="axh"><summary>자세히 보기 (능력치 그래프·점수 매기는 법)</summary>${radarSvg(AXS,sc)}
-    <p class="hint">축구회 회원 ${T.length}명 안에서의 순위(백분위)를 45~99 점수로 바꿨어요. 축구회 중간이 약 72점이에요. 종합 점수는 ${g?`${PGN[g]} 비중(${AXS.filter(ax=>W[ax.k]).map(ax=>ax.n+' '+W[ax.k]).join(' · ')})`:'포지션을 몰라 6개 평균'}으로 매겨요. 75점 이상 금, 65~74 은, 그 아래 동이에요.</p>
-    <p class="hint">${ver===1?'속도: 최고 속도·가속(참고) · 피지컬: 경기당 운동량과 가속·감속 강도 · 활동량: 분당 거리 · 고강도: 고속(시속 20km 이상)과 전력 질주(시속 25km 이상) 거리 · 체력: 쿼터 후반 5분 구간 거리 유지율 · 위치: 작전판 자리에서 벗어난 거리(작을수록 높음).':'공 추적 분석으로 잰 6개 능력치예요.'} 포지션은 작전판 자리, 없으면 평균 위치의 앞뒤로 정해요.</p></details></div>`;
+    <p class="hint">최근 ${CARD_DAYS}일(어제까지) 내 기록을 조기축구 기준표로 30~99점에 맞춰 매겨요. 다른 회원 기록과는 상관없어요. 오늘 경기는 내일부터 반영돼요.</p>
+    <p class="hint">종합 점수는 ${g?`${PGN[g]} 비중(${AXS.filter(ax=>W[ax.k]).map(ax=>ax.n+' '+W[ax.k]).join(' · ')})`:'포지션을 몰라 6개 평균'}으로 매겨요. 75점 이상 금, 65~74 은, 그 아래 동이에요. 변화는 7일 전 기준(그때의 최근 ${CARD_DAYS}일)과 비교해요.</p>
+    <p class="hint">${ver===1?'속도: 가속력·최고 속도(참고)·스프린트 빈도 · 피지컬: 운동량·강도·제동 · 활동량: 분당 거리·활동 범위·민첩성 · 고강도: 고속(시속 20km 이상)·전력 질주(시속 25km 이상) 거리·반복 스프린트 · 체력: 쿼터 후반 거리·고속 거리 유지 · 위치: 작전판 자리·수비 라인·박스 진입·동료 간격.':'공 추적 분석으로 잰 6개 능력치예요.'} 포지션은 작전판 자리, 없으면 평균 위치의 앞뒤로 정해요.</p></details></div>`;
+}
+// 시즌 누적과 개인 최고 기록
+function seasonHtml(D){
+  const s=mergeStats(D.map(d=>d.s)),nq=D.reduce((t,d)=>t+d.q,0);
+  const best=(f,fmt,l,ref)=>{const L=D.filter(d=>nz(f(d.s)));if(!L.length)return '';const b=L.reduce((p,d)=>f(d.s)>f(p.s)?d:p,L[0]);return `<li><span>${l}${ref?REF:''}</span><b>${fmt(f(b.s))}</b><small>${dLabel(b.date)}</small></li>`};
+  return `<div class="card"><h2>시즌 누적</h2><div class="kpi">
+    <div><b>${km(s.distM)}</b><span>총 거리</span></div><div><b>${D.length}경기</b><span>${nq}쿼터 출전</span></div><div><b>${s.mins?Math.round(s.mins/60*10)/10+'시간':'-'}</b><span>총 출전 시간</span></div>
+    <div><b>${nz(s.sprints)?s.sprints+'회':'-'}</b><span>총 스프린트</span></div><div><b>${nz(s.hsrM)?km(s.hsrM):'-'}</b><span>총 고속 거리</span></div><div><b>${s.mins?km(s.distM/s.mins*25):'-'}</b><span>쿼터당 거리(25분 환산)</span></div></div>
+    <h3>개인 최고 기록</h3><ul class="pb">${best(x=>x.distM,km,'하루 최다 거리')}${best(x=>x.vmaxKmh,v=>v.toFixed(1)+'km/h','최고 속도',true)}${best(x=>x.workRate,v=>Math.round(v)+'m','최고 분당 거리')}${best(x=>x.sprints,v=>v+'회','하루 최다 스프린트')}${best(x=>x.hsrM,km,'하루 최다 고속 거리')}</ul></div>`;
 }
 function badgesHtml(D){
   const last=D[D.length-1],s=last.s,B=[],day=scopeRows('d',last.date);
-  const recent=Date.now()-Date.parse(last.date+'T12:00')<7*864e5,when=recent?'이번 주':dLabel(last.date);
+  const recent=nowMs()-Date.parse(last.date+'T12:00')<7*864e5,when=recent?'이번 주':dLabel(last.date);
   const top=f=>{const L=day.filter(r=>nz(f(r.s)));return L.length>=2&&nz(f(s))&&L.every(r=>f(r.s)<=f(s))};
   if(top(x=>x.distM))B.push(['🏃',`${when} 최다 거리`,km(s.distM)]);
   if(top(x=>x.vmaxKmh))B.push(['⚡',`${when} 최고 속도`,s.vmaxKmh.toFixed(1)+'km/h']);
@@ -494,21 +543,28 @@ function trendSvg(D,f,fmt,label,unit){
   let g=`<polyline points="${pts}" fill="none" stroke="#16a34a" stroke-width="2"/>`;
   V.forEach((v,i)=>{if(nz(v))g+=`<circle cx="${X(i)}" cy="${Y(v)}" r="${i===pb_i?4.5:2.8}" fill="${i===pb_i?'#facc15':'#16a34a'}" stroke="${i===pb_i?'#a16207':'none'}"/>`});
   g+=`<text x="${Math.min(W-30,Math.max(30,X(pb_i)))}" y="${Y(mx)-7}" font-size="10" text-anchor="middle" fill="#a16207" font-weight="700">최고 ${fmt(mx)}</text>`;
-  D.forEach((d,i)=>{if(n<=8||i%Math.ceil(n/8)===0||i===n-1)g+=`<text x="${X(i)}" y="${H-3}" font-size="8.5" text-anchor="${n>1&&i===0?'start':n>1&&i===n-1?'end':'middle'}" fill="var(--mute)">${+d.date.slice(5,7)}/${+d.date.slice(8)}</text>`});
+  D.forEach((d,i)=>{if(n<=8||i%Math.ceil(n/8)===0||i===n-1)g+=`<text x="${X(i)}" y="${H-3}" font-size="8.5" text-anchor="${n>1&&i===0?'start':n>1&&i===n-1?'end':'middle'}" fill="var(--mute)">${md(d.date)}</text>`});
   return `<div class="trend"><p><b>${label}</b> <span class="hint">최근 ${nz(last)?fmt(last):'-'}${unit}</span>${isPB?' <span class="pill on">개인 최고 갱신</span>':''}</p><svg viewBox="0 0 ${W} ${H}" style="width:100%">${g}</svg></div>`;
 }
 function trendHtml(D){
   if(D.length<2)return `<div class="card"><h2>시즌 추이</h2><p class="hint">두 경기 이상 기록이 쌓이면 추이를 보여 드려요.</p></div>`;
   return `<div class="card"><h2>시즌 추이</h2>${trendSvg(D,s=>s.distM,v=>(v/1000).toFixed(1),'뛴 거리','km')}${trendSvg(D,s=>s.vmaxKmh,v=>v.toFixed(1),'최고 속도'+REF,'km/h')}${trendSvg(D,s=>s.sprints,v=>Math.round(v),'스프린트','회')}${trendSvg(D,s=>s.workRate,v=>Math.round(v),'분당 거리','m')}<p class="hint">노란 점이 개인 최고 기록(PB)이에요.</p></div>`;
 }
-function pastHtml(D){
-  const last=D.slice(-6).reverse(),arrow=(v,p)=>!nz(v)||!nz(p)?'':v>p*1.03?' <span class="up">▲</span>':v<p*0.97?' <span class="dn">▼</span>':'';
-  return `<div class="card"><h2>지난 경기 비교</h2><table><tr><th>날짜</th><th>Q</th><th>거리</th><th>분당</th><th>최고km/h</th><th>스프린트</th></tr>${last.map((d,i)=>{const p=last[i+1],s=d.s,ps=p&&p.s;
-    return `<tr><td>${dLabel(d.date)}</td><td>${d.q}</td><td>${km(s.distM)}</td><td>${nz(s.workRate)?Math.round(s.workRate):'-'}${arrow(s.workRate,ps&&ps.workRate)}</td><td>${nz(s.vmaxKmh)?s.vmaxKmh.toFixed(1):'-'}${arrow(s.vmaxKmh,ps&&ps.vmaxKmh)}</td><td>${nz(s.sprints)?s.sprints:'-'}${arrow(ps&&s.sprints/s.mins,ps&&ps.sprints/ps.mins)}</td></tr>`}).join('')}</table><p class="hint">▲▼는 바로 앞 경기와 비교예요. 쿼터 수가 달라서 분당 거리와 분당 스프린트로 비교해요.</p></div>`;
+// 경기 탭: 이번 경기와 지난 경기 비교 + 최근 경기 표
+function gameCmpHtml(D,date){
+  const i=D.findIndex(d=>d.date===date);if(i<0)return '';
+  const c=D[i],p=D[i-1],arrow=(v,q)=>!nz(v)||!nz(q)?'':v>q*1.03?' <span class="up">▲</span>':v<q*0.97?' <span class="dn">▼</span>':'';
+  const M=[['뛴 거리',s=>s.distM,km],['분당 거리',s=>s.workRate,v=>Math.round(v)+'m'],['최고 속도'+REF,s=>s.vmaxKmh,v=>v.toFixed(1)],['고속 거리(쿼터당)',s=>perQ(s,s.hsrM),v=>Math.round(v)+'m'],
+    ['스프린트(쿼터당)',s=>perQ(s,s.sprints),v=>v.toFixed(1)],['스태미나',s=>endur(s),v=>Math.round(v*100)+'%']];
+  const top=p?`<table><tr><th>항목</th><th>이번 ${md(c.date)}</th><th>지난 ${md(p.date)}</th></tr><tr><td>출전</td><td>${c.q}쿼터</td><td>${p.q}쿼터</td></tr>${M.map(([l,f,fmt])=>{const v=f(c.s),q=f(p.s);if(!nz(v)&&!nz(q))return '';return `<tr><td>${l}</td><td><b>${nz(v)?fmt(v):'-'}</b>${arrow(v,q)}</td><td>${nz(q)?fmt(q):'-'}</td></tr>`}).join('')}</table>`:'<p class="hint">지난 경기 기록이 없어 비교할 수 없어요.</p>';
+  const last=D.slice(Math.max(0,i-5),i+1).reverse();
+  const tbl=`<h3>최근 경기</h3><table><tr><th>날짜</th><th>Q</th><th>거리</th><th>분당</th><th>최고km/h</th><th>스프린트</th></tr>${last.map((d,j)=>{const q=last[j+1],s=d.s,ps=q&&q.s;
+    return `<tr class="${d.date===date?'me':''}"><td>${dLabel(d.date)}</td><td>${d.q}</td><td>${km(s.distM)}</td><td>${nz(s.workRate)?Math.round(s.workRate):'-'}${arrow(s.workRate,ps&&ps.workRate)}</td><td>${nz(s.vmaxKmh)?s.vmaxKmh.toFixed(1):'-'}${arrow(s.vmaxKmh,ps&&ps.vmaxKmh)}</td><td>${nz(s.sprints)?s.sprints:'-'}${arrow(perQ(s,s.sprints),ps&&perQ(ps,ps.sprints))}</td></tr>`}).join('')}</table>`;
+  return `<div class="card"><h2>이번 경기와 지난 경기</h2>${top}${tbl}<p class="hint">▲▼는 바로 앞 경기와 비교예요. 쿼터 수가 달라서 분당·쿼터당 값으로 비교해요.</p></div>`;
 }
 function loadHtml(D){
   // 최근 1주(급성) ÷ 최근 4주 주평균(만성). 1.3을 넘으면 주의, 1.5를 넘으면 부상 위험이 커진다
-  const now=Date.now(),wk=[0,0,0,0],hs=[0,0,0,0];
+  const now=nowMs(),wk=[0,0,0,0],hs=[0,0,0,0];
   D.forEach(d=>{const i=Math.floor((now-Date.parse(d.date+'T12:00'))/(7*864e5));if(i>=0&&i<4){wk[i]+=d.s.distM||0;hs[i]+=d.s.hsrM||0}});
   const chronic=(wk[0]+wk[1]+wk[2]+wk[3])/4,ratio=chronic?wk[0]/chronic:null,mx=Math.max(...wk,1),hasH=hs.some(x=>x>0);
   let msg='최근 4주 기록이 쌓이면 부하를 알려 드려요.',cls='';
@@ -524,14 +580,11 @@ function loadHtml(D){
     ${[3,2,1,0].map(i=>`<div class="row" style="margin:.25rem 0"><span style="flex:0 0 4.2rem;font-size:.85rem">${L[i]}</span><div class="bar" style="flex:1"><i style="width:${wk[i]/mx*100}%;background:${i===0?'var(--go)':'#94a3b8'}"></i></div><span style="flex:0 0 4.6rem;text-align:right;font-size:.8rem;line-height:1.2">${km(wk[i])}${hasH?`<br><small class="hint">고속 ${km(hs[i])}</small>`:''}</span></div>`).join('')}
     <p class="hint">최근 4주 누적 ${km(wk.reduce((s,x)=>s+x,0))} · 주평균 ${km(chronic)} · 뛴 거리 기준</p></div>`;
 }
+// 내 카드 탭: 선수 카드(최근 1개월), 시즌 누적·개인 최고, 시즌 추이, 배지, 부하 관리
 function mineHtml(){
   const D=dayStats(ST.me.pid);
   if(!D.length)return `<div class="card"><h2>${esc(ST.me.name)} 님 선수 카드</h2><p class="hint">아직 내 기록이 없어요. 경기 탭에서 <b>나 찾기</b>를 하면 기록이 쌓여요.</p></div>`;
-  const d=D.find(x=>x.date===ST.mday)||D[D.length-1];
-  const sel=`<select data-mday>${D.slice().reverse().map(x=>`<option value="${x.date}" ${x.date===d.date?'selected':''}>${dLabel(x.date)} · ${x.q}쿼터</option>`).join('')}</select>`;
-  return cardHtml(D)+badgesHtml(D)+
-    `<div class="card"><h2>경기 리포트</h2>${sel}<p class="hint" style="margin:.3rem 0 .6rem">그날 뛴 쿼터를 모두 합친 기록이에요. 쿼터별로는 경기 탭에서 볼 수 있어요.</p>${reportHtml(d.s,d.P,'d'+d.date)}${cmpHtml(scopeRows('d',d.date),ST.me.pid,d.P,'그날')}</div>`+
-    trendHtml(D)+pastHtml(D)+loadHtml(D);
+  return cardHtml()+seasonHtml(D)+trendHtml(D)+badgesHtml(D)+loadHtml(D);
 }
 
 // 순위 탭
@@ -546,7 +599,8 @@ function rankHtml(){
   return `<div class="card"><h2>축구회 순위</h2><div class="seg">${[['q','이 쿼터 거리'],['d','그날 거리'],['v','최고 속도']].map(([k,l])=>`<button data-rank="${k}" class="${ST.rank===k?'on':''}">${l}</button>`).join('')}</div>
   <p class="hint" style="margin:0 0 .4rem">${esc(title)} · 날짜와 쿼터는 경기 탭에서 고른 것 기준</p>
   <table><tr><th>순위</th><th>이름</th><th>${unit?'최고 속도':'거리'}</th></tr>${rows.map((r,i)=>`<tr class="${r.pid===ST.me.pid?'me':''}"><td>${i+1}</td><td style="text-align:left">${esc(nameOf(r.pid))}</td><td>${fmt(r.v)}</td></tr>`).join('')||'<tr><td colspan="3" class="hint">아직 이름이 맞춰진 선수가 없어요.</td></tr>'}</table>
-  <p class="hint">나 찾기를 한 사람과 운영진이 이름을 맞춘 사람만 나와요.</p></div>`;
+  <p class="hint">나 찾기를 한 사람과 운영진이 이름을 맞춘 사람만 나와요.</p></div>
+  <div class="card"><h2>나와 회원 평균 비교</h2>${cmpHtml(ST.rank==='q'?scopeRows('q',a.id):scopeRows('d',a.date),ST.me.pid,pitchOf(a),ST.rank==='q'?`${dLabel(a.date)} ${a.q}쿼터`:`${dLabel(a.date)} 하루`)||'<p class="hint">이 경기에서 내 기록이 없거나 비교할 회원이 없어요.</p>'}</div>`;
 }
 
 // 관리 탭: 촬영 폰 상태, 원격 조종, 영상 링크, 이름 고치기, 장면 표시, 연결 QR
@@ -644,6 +698,7 @@ document.addEventListener('click',e=>{
   const p=t.closest('[data-pick]');if(p){const n=(ST.P.names||[]).find(x=>x.id===p.dataset.pick);if(n){ST.confirm=n;ST.msg='';render()}return}
   const sl=t.closest('[data-sel]');if(sl){ST.sel=sl.dataset.sel;ST.claimArm=null;ST.msg='';render();return}
   const ax=t.closest('[data-ax]');if(ax){ST.cardOpen=ST.cardOpen===ax.dataset.ax?null:ax.dataset.ax;render();return}
+  const gvb=t.closest('[data-gview]');if(gvb){ST.gview=gvb.dataset.gview;render();return}
   const rk=t.closest('[data-rank]');if(rk){ST.rank=rk.dataset.rank;render();return}
   const bx=t.closest('[data-tid]');if(bx){const a=curAna();if(!a)return;const o=ownerOf(a,bx.dataset.tid);
     if(o){say(o===ST.me.pid?'이 네모가 나예요.':`${nameOf(o)} 님으로 정해진 네모예요.`,o===ST.me.pid?'ok':'');return}
