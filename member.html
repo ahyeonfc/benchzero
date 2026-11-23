@@ -70,6 +70,8 @@ tr.me td{font-weight:800;background:light-dark(#eaf7ee,#1a2d22)}
 .trend{margin:.3rem 0 .6rem}.trend p{margin:0;font-size:.9rem}
 .gauge{position:relative;height:.8rem;border-radius:.4rem;overflow:hidden;margin:.4rem 0 .2rem}.gauge i{position:absolute;top:0;bottom:0}.gauge b{position:absolute;top:-2px;bottom:-2px;width:4px;margin-left:-2px;background:var(--ink);border-radius:2px}
 .gl{position:relative;height:1.1rem;font-size:.72rem;color:var(--mute);margin:0 .6rem}.gl span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+em.ref{font-style:normal;font-size:.68rem;font-weight:700;color:var(--mute);border:1px solid var(--line);border-radius:.3rem;padding:0 .2rem;margin-left:.15rem;vertical-align:1px}
+.ovr.dim{opacity:.45}.few{background:light-dark(#fff7ed,#2a1e12);color:var(--warn);border-radius:.6rem;padding:.4rem .6rem;font-size:.85rem;font-weight:700;margin:.6rem 0 0}
 .axh summary{cursor:pointer;color:var(--mute);font-size:.85rem}
 .seg{display:flex;gap:.3rem;margin-bottom:.6rem}.seg button{flex:1;min-height:2.3rem;font-size:.85rem;padding:0 .3rem}.seg button.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 </style>
@@ -136,7 +138,9 @@ function sumObj(L,k){const o={};let any=false;L.forEach(s=>{const v=s[k];if(!v)r
 function wObj(L,k){const LL=L.filter(s=>s[k]);if(!LL.length)return null;const o={};let W=0;LL.forEach(s=>{const w=s.mins||1;W+=w;for(const z in s[k])o[z]=(o[z]||0)+(s[k][z]||0)*w});for(const z in o)o[z]/=W;return o}
 function wAvg(L,k){const LL=L.filter(s=>nz(s[k]));if(!LL.length)return null;let W=0,t=0;LL.forEach(s=>{const w=s.mins||1;W+=w;t+=s[k]*w});return t/W}
 // 분석기가 안 준 값 중 계산할 수 있는 것만 채운다
-function fillStat(s){s=Object.assign({},s);if(!nz(s.workRate)&&s.mins)s.workRate=s.distM/s.mins;if(!nz(s.avgKmh)&&s.mins)s.avgKmh=s.distM/s.mins*0.06;return s}
+// 카메라 방식은 순간 오차로 최고 속도가 튈 수 있어 34km/h 를 넘는 값은 오류로 보고 버린다
+const VMAX_OK=34,okV=v=>nz(v)&&v>0&&v<=VMAX_OK;
+function fillStat(s){s=Object.assign({},s);if(!okV(s.vmaxKmh))s.vmaxKmh=null;if(!nz(s.workRate)&&s.mins)s.workRate=s.distM/s.mins;if(!nz(s.avgKmh)&&s.mins)s.avgKmh=s.distM/s.mins*0.06;return s}
 // 여러 기록(같은 쿼터의 여러 추적 번호, 또는 하루의 여러 쿼터)을 하나로 합친다
 function mergeStats(L){
   L=L.filter(Boolean);if(!L.length)return null;
@@ -144,7 +148,7 @@ function mergeStats(L){
   const r={},has=k=>L.some(s=>nz(s[k]));
   ['mins','distM','sprints','hsrM','sprintM','accels','decels'].forEach(k=>{if(has(k))r[k]=L.reduce((t,s)=>t+(s[k]||0),0)});
   const z=sumObj(L,'zones');if(z)r.zones=z;const zs=sumObj(L,'zoneSec');if(zs)r.zoneSec=zs;
-  r.vmaxKmh=Math.max(...L.map(s=>s.vmaxKmh||0));
+  {const v=L.map(s=>s.vmaxKmh).filter(okV);r.vmaxKmh=v.length?Math.max(...v):null}
   ['coverPct','devM','nearMate','ownHalf'].forEach(k=>{const v=wAvg(L,k);if(v!=null)r[k]=v});
   ['thirds','lanes','dirs'].forEach(k=>{const v=wObj(L,k);if(v)r[k]=v});
   if(has('hiRatio')){const d=L.reduce((t,s)=>t+(s.distM||0),0);r.hiRatio=d?L.reduce((t,s)=>t+(s.hiRatio||0)*(s.distM||0),0)/d:0}
@@ -226,7 +230,10 @@ function findHtml(a){
   return `<p class="hint" style="margin:0 0 .5rem">${mine.size?'노란 네모가 나예요.':'쿼터 첫 장면에서 <b>내 네모</b>를 눌러 주세요. 한 번 고르면 바꿀 수 없으니 잘 보고 눌러요.'} 확대해서 보려면 두 손가락으로 벌리세요.</p>${arm}<div class="frame" style="aspect-ratio:${f.w||16}/${f.h||9}"><img src="${src}" alt="${a.q}쿼터 첫 장면">${bx}</div><div class="leg"><span><i style="background:#60a5fa"></i>A팀</span><span><i style="background:#f87171"></i>B팀</span><span><i style="background:#facc15"></i>나</span><span>점선: 이미 주인이 있음</span></div>`;
 }
 // ---------- 경기 리포트 (쿼터 하나 또는 그날 합계) ----------
-const ZC={walk:'#94a3b8',jog:'#4ade80',run:'#f59e0b',sprint:'#dc2626'},ZN={walk:'걷기',jog:'조깅',run:'달리기',sprint:'전력 질주'};
+// 카메라 영상으로 잰 순간 값(최고 속도, 가속·감속)은 오차가 있을 수 있어 "참고" 표시를 붙인다
+const REF=' <em class="ref">참고</em>';
+const KPI_HELP='<p class="hint">고속 거리: 시속 20km 이상으로 뛴 거리 · 전력 질주 거리: 시속 25km 이상 · 스프린트: 시속 25km 이상이 1초 이상 이어진 횟수 · <em class="ref">참고</em> 표시는 카메라 영상으로 잰 순간 값이라 오차가 있을 수 있어요.</p>';
+const ZC={walk:'#94a3b8',jog:'#4ade80',run:'#f59e0b',sprint:'#dc2626'},ZN={walk:'걷기',jog:'조깅',run:'달리기',sprint:'고속'};
 const mmss=sec=>`${Math.floor(sec/60)}:${pad(Math.round(sec%60))}`;
 const pitchOf=a=>{const P=(a&&a.pitch)||{};return{w:P.w||100,h:P.h||64}};
 // 작전판 자리(없으면 평균 위치)로 수비·미드·공격을 나눈다. 오른쪽이 공격 방향
@@ -243,14 +250,14 @@ function zonesHtml(z,zs){
     h+=`<p class="hint" style="margin:.2rem 0">거리</p><div class="bar">${Object.keys(ZC).map(k=>`<i style="width:${(z[k]||0)/t*100}%;background:${ZC[k]}"></i>`).join('')}</div><div class="leg">${Object.keys(ZC).map(k=>`<span><i style="background:${ZC[k]}"></i>${ZN[k]} ${km(z[k]||0)}</span>`).join('')}</div>`}
   if(zs){const t=Object.keys(ZC).reduce((s,k)=>s+(zs[k]||0),0)||1;
     h+=`<p class="hint" style="margin:.5rem 0 .2rem">시간</p><div class="bar">${Object.keys(ZC).map(k=>`<i style="width:${(zs[k]||0)/t*100}%;background:${ZC[k]}"></i>`).join('')}</div><div class="leg">${Object.keys(ZC).map(k=>`<span><i style="background:${ZC[k]}"></i>${ZN[k]} ${mmss(zs[k]||0)}</span>`).join('')}</div>`}
-  return h?`<h3>속도 구간별 거리·시간</h3>${h}<p class="hint">걷기 7km/h 미만 · 조깅 7~14 · 달리기 14~20 · 전력 질주 20km/h 이상</p>`:'';
+  return h?`<h3>속도 구간별 거리·시간</h3>${h}<p class="hint">걷기 시속 7km 미만 · 조깅 7~14 · 달리기 14~20 · 고속 20 이상(이 구간 거리가 고속 거리)</p>`:'';
 }
 function kpiHtml(s){
   const K=[[nz(s.distM)?km(s.distM):null,'뛴 거리'],[nz(s.mins)?Math.round(s.mins)+'분':null,'출전 시간'],[nz(s.workRate)?Math.round(s.workRate)+'m':null,'분당 거리'],
-    [nz(s.vmaxKmh)?s.vmaxKmh.toFixed(1):null,'최고 속도 km/h'],[nz(s.avgKmh)?s.avgKmh.toFixed(1):null,'평균 속도 km/h'],[nz(s.hsrM)?km(s.hsrM):null,'고속 거리 20+'],
-    [nz(s.sprintM)?km(s.sprintM):null,'전력 거리 25+'],[nz(s.sprints)?s.sprints+'회':null,'스프린트'],[nz(s.accels)?s.accels+'회':null,'가속'],
-    [nz(s.decels)?s.decels+'회':null,'감속'],[nz(s.hiRatio)?pct(s.hiRatio):null,'고강도 비율'],[nz(s.coverPct)?pct(s.coverPct):null,'활동 범위']].filter(k=>k[0]!=null);
-  return `<div class="kpi">${K.map(([v,l])=>`<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>`;
+    [nz(s.vmaxKmh)?s.vmaxKmh.toFixed(1):null,'최고 속도 km/h'+REF],[nz(s.avgKmh)?s.avgKmh.toFixed(1):null,'평균 속도 km/h'],[nz(s.hsrM)?km(s.hsrM):null,'고속 거리(시속 20+)'],
+    [nz(s.sprintM)?km(s.sprintM):null,'전력 질주 거리(시속 25+)'],[nz(s.sprints)?s.sprints+'회':null,'스프린트'],[nz(s.accels)?s.accels+'회':null,'가속'+REF],
+    [nz(s.decels)?s.decels+'회':null,'감속'+REF],[nz(s.hiRatio)?pct(s.hiRatio):null,'고강도 비율'],[nz(s.coverPct)?pct(s.coverPct):null,'활동 범위']].filter(k=>k[0]!=null);
+  return `<div class="kpi">${K.map(([v,l])=>`<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>${KPI_HELP}`;
 }
 function speedSvg(s){
   const S=s.speedSeries;if(!S||S.length<2)return '';
@@ -263,7 +270,7 @@ function speedSvg(s){
   g+=`<polygon points="${X(0)},${Y(0)} ${pts} ${X(n-1)},${Y(0)}" fill="rgba(22,163,74,.15)"/><polyline points="${pts}" fill="none" stroke="#16a34a" stroke-width="1.4"/>`;
   const mi=S.indexOf(Math.max(...S));g+=`<circle cx="${X(mi)}" cy="${Y(S[mi])}" r="3.5" fill="#dc2626"/>`;
   const tot=n/6,step=tot>60?20:tot>30?10:5;for(let m=0;m<=tot;m+=step)g+=`<text x="${X(Math.min(n-1,m*6))}" y="${H-4}" font-size="9" text-anchor="middle" fill="var(--mute)">${m}분</text>`;
-  return `<h3>속도 그래프</h3><svg viewBox="0 0 ${W} ${H}" style="width:100%">${g}</svg><div class="leg"><span><i style="background:#f59e0b"></i>고속 20km/h</span><span><i style="background:#dc2626"></i>전력 25km/h</span><span>빨간 점: 최고 속도</span>${(s._segs||[]).length>1?'<span>세로선: 쿼터 경계</span>':''}</div>`;
+  return `<h3>속도 그래프</h3><svg viewBox="0 0 ${W} ${H}" style="width:100%">${g}</svg><div class="leg"><span><i style="background:#f59e0b"></i>고속 20km/h</span><span><i style="background:#dc2626"></i>전력 25km/h</span><span>빨간 점: 가장 빨랐던 10초</span>${(s._segs||[]).length>1?'<span>세로선: 쿼터 경계</span>':''}</div><p class="hint" style="margin:0">10초 평균 속도라서 순간 최고 속도보다 낮게 보여요.</p>`;
 }
 function d5Html(s){
   const G=s._d5||[];if(!G.length)return '';
@@ -326,8 +333,8 @@ function teamHtml(a){const T=a.team||{},ks=Object.keys(T).sort();if(!ks.length)r
 function groupRows(rows){const m={};rows.forEach(r=>{(m[r.pid]=m[r.pid]||[]).push(r.s)});return Object.entries(m).map(([pid,L])=>({pid,s:mergeStats(L),n:L.length}))}
 function scopeRows(kind,key){const R=allRows();return groupRows(kind==='q'?R.filter(r=>r.a.id===key):R.filter(r=>r.a.date===key))}
 const per25=(s,k)=>nz(s[k])&&s.mins?s[k]/s.mins*25:null;
-const CMP=[['분당 거리',s=>s.workRate,v=>Math.round(v)+'m'],['최고 속도',s=>s.vmaxKmh,v=>v.toFixed(1)],['고속 거리/25분',s=>per25(s,'hsrM'),v=>Math.round(v)+'m'],
-  ['스프린트/25분',s=>per25(s,'sprints'),v=>v.toFixed(1)],['가속·감속/25분',s=>nz(s.accels)&&s.mins?((s.accels||0)+(s.decels||0))/s.mins*25:null,v=>v.toFixed(1)],['활동 범위',s=>s.coverPct,pct]];
+const CMP=[['분당 거리',s=>s.workRate,v=>Math.round(v)+'m'],['최고 속도'+REF,s=>s.vmaxKmh,v=>v.toFixed(1)],['고속 거리(쿼터 환산)',s=>per25(s,'hsrM'),v=>Math.round(v)+'m'],
+  ['스프린트(쿼터 환산)',s=>per25(s,'sprints'),v=>v.toFixed(1)],['가속·감속(쿼터 환산)'+REF,s=>nz(s.accels)&&s.mins?((s.accels||0)+(s.decels||0))/s.mins*25:null,v=>v.toFixed(1)],['활동 범위',s=>s.coverPct,pct]];
 function cmpHtml(rows,pid,P,title){
   const me=rows.find(r=>r.pid===pid),others=rows.filter(r=>r.pid!==pid);if(!me||!others.length)return '';
   const g=posGroup(me.s,P),same=g?others.filter(r=>posGroup(r.s,P)===g):[];
@@ -363,13 +370,15 @@ function cardHtml(D){
   const T=seasonTable(),me=T.find(r=>r.pid===ST.me.pid);if(!me)return '';
   const sc={};AX.forEach(([k])=>{sc[k]=pctScore(me.ax[k],T.map(r=>r.ax[k]))});
   const vs=AX.map(([k])=>sc[k]).filter(nz),ovr=vs.length?Math.round(mean(vs)):null,s=me.s,g=posGroup(s,D[D.length-1].P);
-  return `<div class="card"><div class="row" style="align-items:center;gap:.8rem"><div class="ovr"><b>${ovr??'-'}</b><span>종합</span></div>
+  // 비교 대상이 8명 미만이거나 내 출전이 3쿼터 미만이면 점수가 들쭉날쭉하므로 참고용으로만 보여 준다
+  const few=T.length<8||me.n<3;
+  return `<div class="card"><div class="row" style="align-items:center;gap:.8rem"><div class="ovr${few?' dim':''}"><b>${ovr??'-'}</b><span>종합</span></div>
     <div style="flex:1"><h2 style="margin:0">${esc(ST.me.name)}</h2><p class="hint" style="margin:0">${g?PGN[g]+' · ':''}${D.length}경기 ${me.n}쿼터 출전</p></div></div>
-    ${radarSvg(sc)}
+    ${few?`<p class="few">아직 비교할 기록이 적어 참고용이에요 (비교 대상 ${T.length}명 · 내 출전 ${me.n}쿼터). 8명 이상, 3쿼터 이상 쌓이면 점수가 안정돼요.</p>`:''}${radarSvg(sc)}
     <p class="hint" style="text-align:center;margin-top:0">축구회 회원 ${T.length}명 중 백분위 점수예요(점선 50 = 축구회 중간).</p>
-    <div class="kpi"><div><b>${km(s.distM)}</b><span>누적 거리</span></div><div><b>${(s.vmaxKmh||0).toFixed(1)}</b><span>최고 속도 km/h</span></div><div><b>${nz(s.workRate)?Math.round(s.workRate)+'m':'-'}</b><span>평균 분당 거리</span></div>
-    <div><b>${nz(s.sprints)?s.sprints+'회':'-'}</b><span>누적 스프린트</span></div><div><b>${nz(s.hsrM)?km(s.hsrM):'-'}</b><span>누적 고속 거리</span></div><div><b>${s.mins?km(s.distM/s.mins*25):'-'}</b><span>25분당 거리</span></div></div>
-    <details class="axh"><summary>점수는 이렇게 매겨요</summary><p class="hint">속도: 최고 속도 · 활동량: 분당 거리 · 폭발력: 25분당 스프린트+가속 · 지구력: 쿼터 후반 거리 유지율 · 위치 지키기: 작전판 자리에서 벗어난 거리(작을수록 높음) · 공간 활용: 활동 범위</p></details></div>`;
+    <div class="kpi"><div><b>${km(s.distM)}</b><span>누적 거리</span></div><div><b>${nz(s.vmaxKmh)?s.vmaxKmh.toFixed(1):'-'}</b><span>최고 속도 km/h${REF}</span></div><div><b>${nz(s.workRate)?Math.round(s.workRate)+'m':'-'}</b><span>평균 분당 거리</span></div>
+    <div><b>${nz(s.sprints)?s.sprints+'회':'-'}</b><span>누적 스프린트</span></div><div><b>${nz(s.hsrM)?km(s.hsrM):'-'}</b><span>누적 고속 거리</span></div><div><b>${s.mins?km(s.distM/s.mins*25):'-'}</b><span>쿼터당 거리(25분 환산)</span></div></div>
+    <details class="axh"><summary>점수는 이렇게 매겨요</summary><p class="hint">속도: 최고 속도 · 활동량: 분당 거리 · 폭발력: 쿼터(25분)당 스프린트+가속 횟수 · 지구력: 쿼터 후반 거리 유지율 · 위치 지키기: 작전판 자리에서 벗어난 거리(작을수록 높음) · 공간 활용: 활동 범위<br>스프린트는 시속 25km 이상이 1초 이상 이어진 횟수예요. 고속 거리는 시속 20km 이상, 전력 질주 거리는 시속 25km 이상으로 뛴 거리예요.</p></details></div>`;
 }
 function badgesHtml(D){
   const last=D[D.length-1],s=last.s,B=[],day=scopeRows('d',last.date);
@@ -402,12 +411,12 @@ function trendSvg(D,f,fmt,label,unit){
 }
 function trendHtml(D){
   if(D.length<2)return `<div class="card"><h2>시즌 추이</h2><p class="hint">두 경기 이상 기록이 쌓이면 추이를 보여 드려요.</p></div>`;
-  return `<div class="card"><h2>시즌 추이</h2>${trendSvg(D,s=>s.distM,v=>(v/1000).toFixed(1),'뛴 거리','km')}${trendSvg(D,s=>s.vmaxKmh,v=>v.toFixed(1),'최고 속도','km/h')}${trendSvg(D,s=>s.sprints,v=>Math.round(v),'스프린트','회')}${trendSvg(D,s=>s.workRate,v=>Math.round(v),'분당 거리','m')}<p class="hint">노란 점이 개인 최고 기록(PB)이에요.</p></div>`;
+  return `<div class="card"><h2>시즌 추이</h2>${trendSvg(D,s=>s.distM,v=>(v/1000).toFixed(1),'뛴 거리','km')}${trendSvg(D,s=>s.vmaxKmh,v=>v.toFixed(1),'최고 속도'+REF,'km/h')}${trendSvg(D,s=>s.sprints,v=>Math.round(v),'스프린트','회')}${trendSvg(D,s=>s.workRate,v=>Math.round(v),'분당 거리','m')}<p class="hint">노란 점이 개인 최고 기록(PB)이에요.</p></div>`;
 }
 function pastHtml(D){
   const last=D.slice(-6).reverse(),arrow=(v,p)=>!nz(v)||!nz(p)?'':v>p*1.03?' <span class="up">▲</span>':v<p*0.97?' <span class="dn">▼</span>':'';
   return `<div class="card"><h2>지난 경기 비교</h2><table><tr><th>날짜</th><th>Q</th><th>거리</th><th>분당</th><th>최고km/h</th><th>스프린트</th></tr>${last.map((d,i)=>{const p=last[i+1],s=d.s,ps=p&&p.s;
-    return `<tr><td>${dLabel(d.date)}</td><td>${d.q}</td><td>${km(s.distM)}</td><td>${nz(s.workRate)?Math.round(s.workRate):'-'}${arrow(s.workRate,ps&&ps.workRate)}</td><td>${(s.vmaxKmh||0).toFixed(1)}${arrow(s.vmaxKmh,ps&&ps.vmaxKmh)}</td><td>${nz(s.sprints)?s.sprints:'-'}${arrow(ps&&s.sprints/s.mins,ps&&ps.sprints/ps.mins)}</td></tr>`}).join('')}</table><p class="hint">▲▼는 바로 앞 경기와 비교예요. 쿼터 수가 달라서 분당 거리와 분당 스프린트로 비교해요.</p></div>`;
+    return `<tr><td>${dLabel(d.date)}</td><td>${d.q}</td><td>${km(s.distM)}</td><td>${nz(s.workRate)?Math.round(s.workRate):'-'}${arrow(s.workRate,ps&&ps.workRate)}</td><td>${nz(s.vmaxKmh)?s.vmaxKmh.toFixed(1):'-'}${arrow(s.vmaxKmh,ps&&ps.vmaxKmh)}</td><td>${nz(s.sprints)?s.sprints:'-'}${arrow(ps&&s.sprints/s.mins,ps&&ps.sprints/ps.mins)}</td></tr>`}).join('')}</table><p class="hint">▲▼는 바로 앞 경기와 비교예요. 쿼터 수가 달라서 분당 거리와 분당 스프린트로 비교해요.</p></div>`;
 }
 function loadHtml(D){
   // 최근 1주(급성) ÷ 최근 4주 주평균(만성). 1.3을 넘으면 주의, 1.5를 넘으면 부상 위험이 커진다
@@ -443,7 +452,7 @@ function rankHtml(){
   const R=allRows();let rows=[],title='',unit='';
   if(ST.rank==='q'){rows=R.filter(r=>r.a.id===a.id).map(r=>({pid:r.pid,v:r.s.distM||0}));title=`${dLabel(a.date)} ${a.q}쿼터 뛴 거리`}
   else if(ST.rank==='d'){const m={};R.filter(r=>r.a.date===a.date).forEach(r=>{m[r.pid]=(m[r.pid]||0)+(r.s.distM||0)});rows=Object.entries(m).map(([pid,v])=>({pid,v}));title=`${dLabel(a.date)} 하루 뛴 거리`}
-  else{const m={};R.forEach(r=>{m[r.pid]=Math.max(m[r.pid]||0,r.s.vmaxKmh||0)});rows=Object.entries(m).map(([pid,v])=>({pid,v}));title='최고 속도 (전체 기간)';unit='km/h'}
+  else{const m={};R.forEach(r=>{m[r.pid]=Math.max(m[r.pid]||0,r.s.vmaxKmh||0)});rows=Object.entries(m).map(([pid,v])=>({pid,v})).filter(r=>r.v>0);title='최고 속도 (전체 기간) · 참고 값';unit='km/h'}
   rows.sort((x,y)=>y.v-x.v);
   const fmt=v=>unit?v.toFixed(1)+' '+unit:km(v);
   return `<div class="card"><h2>축구회 순위</h2><div class="seg">${[['q','이 쿼터 거리'],['d','그날 거리'],['v','최고 속도']].map(([k,l])=>`<button data-rank="${k}" class="${ST.rank===k?'on':''}">${l}</button>`).join('')}</div>
