@@ -38,6 +38,9 @@ function cropImg(team,i,k){
   g.fillStyle=shorts;g.fillRect(30+dx,92,36,20);g.fillStyle=skin;g.fillRect(33+dx,112,11,34);g.fillRect(52+dx,112,11,34);g.fillStyle='#222';g.fillRect(31+dx,146,14,7);g.fillRect(51+dx,146,14,7);
   return c.toDataURL('image/jpeg',.8).split(',')[1];
 }
+function toAbs(s,team){const b=team==='B',W=100,H=64,pt=p=>[+(b?W-p[0]:p[0]).toFixed(1),+(b?p[1]:H-p[1]).toFixed(1)],o=Object.assign({},s);
+  o.avg=pt(s.avg);if(s.board)o.board=pt(s.board);o.sprintPaths=(s.sprintPaths||[]).map(x=>{const f=x.p,r=[];for(let i=0;i+1<f.length;i+=2)r.push(...pt([f[i],f[i+1]]));return {p:r}});
+  const h=new Array(96);for(let r=0;r<8;r++)for(let c=0;c<12;c++)h[(b?r:7-r)*12+(b?11-c:c)]=s.heat[r*12+c];o.heat=h;return o}
 function quarter(date,q,startMs){
   const tracks=[],stats={};
   for(let i=0;i<14;i++){
@@ -82,7 +85,10 @@ function quarter(date,q,startMs){
       hsrHalves:(()=>{const a=Math.round(hsr*(0.5+rnd()*0.12));return [a,hsr-a]})()};
   }
   // 습관 식별 정보(idf): 키(m), 평균 위치(운동장 비율), 좌우·앞뒤 비율
-  tracks.forEach(t=>{const s=stats[t.tid];t.idf={hM:+(1.62+((+t.tid%7)*0.03)).toFixed(2),zone:[+(s.avg[0]/100).toFixed(3),+(s.avg[1]/64).toFixed(3)],lanes:s.lanes,thirds:s.thirds}});
+  tracks.forEach(t=>{const s=stats[t.tid];t.idf={hM:+(1.62+((+t.tid%7)*0.03)).toFixed(2),zone:[+(s.avg[0]/100).toFixed(3),+(1-s.avg[1]/64).toFixed(3)],lanes:s.lanes,thirds:s.thirds}});
+  // 위 값은 "공격이 오른쪽, 위가 왼쪽" 화면 좌표로 만들었으니 분석기와 같은 운동장 절대 좌표로 바꿔 저장한다
+  // (x=0 A팀 골라인, y=0 카메라 쪽, heat 0번 행 = 카메라 쪽 줄). A팀: y 뒤집기, B팀: x 뒤집기
+  tracks.forEach(t=>{stats[t.tid]=toAbs(stats[t.tid],t.team)});
   return {v:1,date,q,startMs,endMs:startMs+25*6e4,source:'benchzero',video:{yt:q===1?'https://youtu.be/aqz-KE-bpKQ':null,drive:q===2?'https://drive.google.com/':null,offsetSec:0},
     frame:{w:1280,h:720,jpg:frame(tracks)},tracks,stats,
     team:{A:{lineYm:28.4+q,widthM:41.2,lengthM:33.5,distM:22400,color:'#1d4ed8'},B:{lineYm:31.0-q,widthM:38.7,lengthM:30.1,distM:21800,color:'#ea580c'}},
