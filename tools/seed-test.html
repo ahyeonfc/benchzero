@@ -36,10 +36,23 @@ function quarter(date,q,startMs){
     // 쿼터 1은 일부만 작전판 자동 매칭, 나머지는 나 찾기로
     const pid=q===1&&i<4?'p'+(i+1):q===2&&i<2?'p'+(i+1):null;
     tracks.push({tid,team,box:[+(cx-w/2).toFixed(4),+(0.17+fy*0.72-h).toFixed(4),+w.toFixed(4),+h.toFixed(4)],pid,by:pid?'board':null});
-    const mins=20+rnd()*5,dist=1800+rnd()*1400,z={walk:dist*.3,jog:dist*.4,run:dist*.2,sprint:dist*.1*(0.5+rnd())};
+    // 10초 평균 속도 흉내: 기본 조깅 속도 + 쿼터 후반 체력 저하 + 가끔 스프린트
+    const mins=20+rnd()*5,N=Math.round(mins*6),base=5+rnd()*4,fat=0.05+rnd()*0.25,top=24+rnd()*8,sp=[];
+    for(let k=0;k<N;k++){let v=base*(1-fat*k/N)+(rnd()-.5)*4;if(rnd()<0.035){v=18+rnd()*(top-18)}v=Math.max(0.5,Math.min(top,v));sp.push(+v.toFixed(1))}
+    const z={walk:0,jog:0,run:0,sprint:0},zs={walk:0,jog:0,run:0,sprint:0};let dist=0,hsr=0,sprM=0,sprints=0,prev=0;
+    const dist5=[];sp.forEach((v,k)=>{const m=v/3.6*10;dist+=m;const zk=v<7?'walk':v<14?'jog':v<20?'run':'sprint';z[zk]+=m;zs[zk]+=10;if(v>20)hsr+=m;if(v>25){sprM+=m;if(prev<=25)sprints++}prev=v;const b=Math.floor(k/30);dist5[b]=(dist5[b]||0)+m});
     const ax=fx*100,ay=fy*64,heat=[];for(let r=0;r<8;r++)for(let k=0;k<12;k++){const dx=(k+.5)/12*100-ax,dy=(r+.5)/8*64-ay;heat.push(+Math.exp(-(dx*dx/500+dy*dy/250)).toFixed(3))}
     const board=[ax+(rnd()-.5)*16,ay+(rnd()-.5)*12];
-    stats[tid]={mins:+mins.toFixed(1),distM:Math.round(dist),zones:Object.fromEntries(Object.entries(z).map(([k,v])=>[k,Math.round(v)])),sprints:Math.round(3+rnd()*12),hiRatio:+((z.run+z.sprint)/dist).toFixed(3),vmaxKmh:+(22+rnd()*9).toFixed(1),heat,avg:[+ax.toFixed(1),+ay.toFixed(1)],board:[+board[0].toFixed(1),+board[1].toFixed(1)],devM:+Math.hypot(board[0]-ax,board[1]-ay).toFixed(1),coverPct:+(15+rnd()*25).toFixed(1)};
+    // 히트맵에서 3등분·좌우·우리 진영 비율을 뽑는다
+    const hs=heat.reduce((s,v)=>s+v,0)||1,col=(a,b)=>heat.reduce((s,v,i)=>s+((i%12)>=a&&(i%12)<b?v:0),0)/hs,row=(a,b)=>heat.reduce((s,v,i)=>s+(Math.floor(i/12)>=a&&Math.floor(i/12)<b?v:0),0)/hs;
+    const paths=[];for(let k=0;k<Math.max(sprints,1);k++){const sx=Math.max(5,Math.min(90,ax+(rnd()-.5)*30)),sy=Math.max(4,Math.min(60,ay+(rnd()-.5)*20)),ang=(rnd()-.5)*1.6+(rnd()<.25?Math.PI:0),len=15+rnd()*20;
+      paths.push([0,1,2,3].map(j=>[+(Math.max(1,Math.min(99,sx+Math.cos(ang+j*.15*(rnd()-.5))*len*j/3))).toFixed(1),+(Math.max(1,Math.min(63,sy+Math.sin(ang)*len*j/3))).toFixed(1)]))}
+    const fw=.3+rnd()*.15,bk=.22+rnd()*.12;
+    stats[tid]={mins:+mins.toFixed(1),distM:Math.round(dist),zones:Object.fromEntries(Object.entries(z).map(([k,v])=>[k,Math.round(v)])),zoneSec:zs,sprints,hiRatio:+((z.run+z.sprint)/dist).toFixed(3),vmaxKmh:Math.max(...sp),heat,avg:[+ax.toFixed(1),+ay.toFixed(1)],board:[+board[0].toFixed(1),+board[1].toFixed(1)],devM:+Math.hypot(board[0]-ax,board[1]-ay).toFixed(1),coverPct:+(15+rnd()*25).toFixed(1),
+      avgKmh:+(dist/mins*0.06).toFixed(2),workRate:+(dist/mins).toFixed(1),hsrM:Math.round(hsr),sprintM:Math.round(sprM),accels:Math.round(6+rnd()*18),decels:Math.round(5+rnd()*16),
+      speedSeries:sp,dist5:dist5.map(v=>Math.round(v)),sprintPaths:paths.slice(0,sprints).map(p=>({p:p.flat()})),
+      thirds:{def:+col(0,4).toFixed(3),mid:+col(4,8).toFixed(3),att:+col(8,12).toFixed(3)},lanes:{l:+row(0,3).toFixed(3),c:+row(3,5).toFixed(3),r:+row(5,8).toFixed(3)},ownHalf:+col(0,6).toFixed(3),
+      dirs:{fwd:+fw.toFixed(3),back:+bk.toFixed(3),side:+(1-fw-bk).toFixed(3)},nearMate:+(7+rnd()*12).toFixed(1)};
   }
   return {v:1,date,q,startMs,endMs:startMs+25*6e4,source:'benchzero',video:{yt:q===1?'https://youtu.be/aqz-KE-bpKQ':null,drive:q===2?'https://drive.google.com/':null,offsetSec:0},
     frame:{w:1280,h:720,jpg:frame(tracks)},tracks,stats,

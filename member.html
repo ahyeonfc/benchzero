@@ -48,7 +48,7 @@ textarea{padding:.5rem .8rem}
 .frame .bx::after{content:"";position:absolute;inset:-12px -8px}
 .frame .bx span{position:absolute;left:0;bottom:100%;font-size:.65rem;background:#000a;color:#fff;padding:0 .2rem;white-space:nowrap;border-radius:2px}
 .bar{display:flex;height:1.2rem;border-radius:.4rem;overflow:hidden;background:var(--bg)}
-.bar i{display:block}
+.bar i{display:block;font-style:normal}
 .leg{display:flex;gap:.8rem;flex-wrap:wrap;font-size:.78rem;color:var(--mute);margin-top:.3rem}.leg i{display:inline-block;width:.7rem;height:.7rem;border-radius:2px;margin-right:.25rem;vertical-align:-1px}
 canvas{display:block;width:100%;border-radius:.6rem}
 table{width:100%;border-collapse:collapse;font-size:.9rem}
@@ -64,6 +64,13 @@ tr.me td{font-weight:800;background:light-dark(#eaf7ee,#1a2d22)}
 .qr{width:12rem;margin:.5rem auto;background:#fff;padding:.4rem;border-radius:.5rem}
 .list{margin:0;padding:0;list-style:none}.list li{padding:.4rem 0;border-bottom:1px solid var(--line);font-size:.9rem;display:flex;gap:.5rem;align-items:center}
 .list li select{width:auto;flex:1;min-height:2.3rem}
+.bar.sb{height:1.6rem}.bar.sb i{color:#fff;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden}
+.ovr{flex:0 0 4.6rem;height:4.6rem;border-radius:1rem;background:var(--deep);color:#fff;display:grid;place-items:center;align-content:center}.ovr b{font-size:2rem;line-height:1}.ovr span{font-size:.75rem;opacity:.85}
+.badges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}.badges div{background:var(--bg);border-radius:.75rem;padding:.5rem .6rem;display:flex;flex-direction:column}.badges .bi{font-size:1.4rem;line-height:1.2}.badges b{font-size:.9rem}.badges small{color:var(--mute);font-size:.78rem}
+.trend{margin:.3rem 0 .6rem}.trend p{margin:0;font-size:.9rem}
+.gauge{position:relative;height:.8rem;border-radius:.4rem;overflow:hidden;margin:.4rem 0 .2rem}.gauge i{position:absolute;top:0;bottom:0}.gauge b{position:absolute;top:-2px;bottom:-2px;width:4px;margin-left:-2px;background:var(--ink);border-radius:2px}
+.gl{position:relative;height:1.1rem;font-size:.72rem;color:var(--mute);margin:0 .6rem}.gl span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.axh summary{cursor:pointer;color:var(--mute);font-size:.85rem}
 .seg{display:flex;gap:.3rem;margin-bottom:.6rem}.seg button{flex:1;min-height:2.3rem;font-size:.85rem;padding:0 .3rem}.seg button.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 </style>
 </head>
@@ -122,13 +129,33 @@ const sortedAna=()=>ST.ana.slice().sort((a,b)=>(a.date||'').localeCompare(b.date
 const dates=()=>[...new Set(sortedAna().map(a=>a.date))].reverse();
 function ownerOf(a,tid){const t=(a.tracks||[]).find(x=>String(x.tid)===String(tid));if(t&&t.pid)return t.pid;const c=ST.claims[a.id]&&ST.claims[a.id][tid];return c?c.pid:null}
 function tidsOf(a,pid){return (a.tracks||[]).map(t=>String(t.tid)).filter(tid=>ownerOf(a,tid)===pid)}
-function statOf(a,pid){
-  // 한 사람이 여러 추적 번호로 나뉘었으면 합친다(거리·시간은 더하고 최고 속도는 큰 값)
-  const L=tidsOf(a,pid).map(t=>a.stats&&a.stats[t]).filter(Boolean);if(!L.length)return null;if(L.length===1)return L[0];
-  const r={mins:0,distM:0,zones:{walk:0,jog:0,run:0,sprint:0},sprints:0,vmaxKmh:0,heat:new Array(96).fill(0),avg:null,board:null,devM:null,coverPct:0};
-  let hi=0;L.forEach(s=>{r.mins+=s.mins||0;r.distM+=s.distM||0;for(const k in r.zones)r.zones[k]+=(s.zones&&s.zones[k])||0;r.sprints+=s.sprints||0;r.vmaxKmh=Math.max(r.vmaxKmh,s.vmaxKmh||0);hi+=(s.hiRatio||0)*(s.distM||0);(s.heat||[]).forEach((v,i)=>r.heat[i]+=v*(s.mins||1));r.coverPct=Math.max(r.coverPct,s.coverPct||0)});
-  const mx=Math.max(...r.heat,1e-9);r.heat=r.heat.map(v=>v/mx);r.hiRatio=r.distM?hi/r.distM:0;const b=L.reduce((p,s)=>(s.mins||0)>(p.mins||0)?s:p,L[0]);r.avg=b.avg;r.board=b.board;r.devM=b.devM;return r;
+// ---------- 분석 계산 ----------
+const nz=v=>v!=null&&typeof v==='number'&&!isNaN(v);
+const mean=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:null;
+function sumObj(L,k){const o={};let any=false;L.forEach(s=>{const v=s[k];if(!v)return;any=true;for(const z in v)o[z]=(o[z]||0)+(v[z]||0)});return any?o:null}
+function wObj(L,k){const LL=L.filter(s=>s[k]);if(!LL.length)return null;const o={};let W=0;LL.forEach(s=>{const w=s.mins||1;W+=w;for(const z in s[k])o[z]=(o[z]||0)+(s[k][z]||0)*w});for(const z in o)o[z]/=W;return o}
+function wAvg(L,k){const LL=L.filter(s=>nz(s[k]));if(!LL.length)return null;let W=0,t=0;LL.forEach(s=>{const w=s.mins||1;W+=w;t+=s[k]*w});return t/W}
+// 분석기가 안 준 값 중 계산할 수 있는 것만 채운다
+function fillStat(s){s=Object.assign({},s);if(!nz(s.workRate)&&s.mins)s.workRate=s.distM/s.mins;if(!nz(s.avgKmh)&&s.mins)s.avgKmh=s.distM/s.mins*0.06;return s}
+// 여러 기록(같은 쿼터의 여러 추적 번호, 또는 하루의 여러 쿼터)을 하나로 합친다
+function mergeStats(L){
+  L=L.filter(Boolean);if(!L.length)return null;
+  if(L.length===1){const s=fillStat(L[0]);s._segs=s.speedSeries?[s.speedSeries.length]:[];s._d5=s.dist5&&s.dist5.length?[s.dist5]:[];s._d5m=s._d5.length?[s.mins]:[];return s}
+  const r={},has=k=>L.some(s=>nz(s[k]));
+  ['mins','distM','sprints','hsrM','sprintM','accels','decels'].forEach(k=>{if(has(k))r[k]=L.reduce((t,s)=>t+(s[k]||0),0)});
+  const z=sumObj(L,'zones');if(z)r.zones=z;const zs=sumObj(L,'zoneSec');if(zs)r.zoneSec=zs;
+  r.vmaxKmh=Math.max(...L.map(s=>s.vmaxKmh||0));
+  ['coverPct','devM','nearMate','ownHalf'].forEach(k=>{const v=wAvg(L,k);if(v!=null)r[k]=v});
+  ['thirds','lanes','dirs'].forEach(k=>{const v=wObj(L,k);if(v)r[k]=v});
+  if(has('hiRatio')){const d=L.reduce((t,s)=>t+(s.distM||0),0);r.hiRatio=d?L.reduce((t,s)=>t+(s.hiRatio||0)*(s.distM||0),0)/d:0}
+  const ss=L.filter(s=>s.speedSeries&&s.speedSeries.length);r.speedSeries=ss.length?[].concat(...ss.map(s=>s.speedSeries)):null;r._segs=ss.map(s=>s.speedSeries.length);
+  r._d5=L.filter(s=>s.dist5&&s.dist5.length).map(s=>s.dist5);r._d5m=L.filter(s=>s.dist5&&s.dist5.length).map(s=>s.mins);
+  r.sprintPaths=[].concat(...L.map(s=>s.sprintPaths||[]));
+  const hs=L.filter(s=>s.heat&&s.heat.length===96);if(hs.length){const h=new Array(96).fill(0);hs.forEach(s=>s.heat.forEach((v,i)=>h[i]+=v*(s.mins||1)));const mx=Math.max(...h,1e-9);r.heat=h.map(v=>v/mx)}
+  const b=L.reduce((p,s)=>(s.mins||0)>(p.mins||0)?s:p,L[0]);r.avg=b.avg;r.board=b.board;
+  return fillStat(r);
 }
+function statOf(a,pid){return mergeStats(tidsOf(a,pid).map(t=>a.stats&&a.stats[t]))}
 // 사람별 기록 모음: 전체 분석 문서에서 pid 로 묶는다
 function allRows(){const out=[];sortedAna().forEach(a=>{const seen=new Set();(a.tracks||[]).forEach(t=>{const pid=ownerOf(a,t.tid);if(!pid||seen.has(pid))return;seen.add(pid);const s=statOf(a,pid);if(s)out.push({a,pid,s})})});return out}
 
@@ -179,7 +206,7 @@ function gameHtml(){
   return `<div class="card">${sel}${qb}</div>
   <div class="card"><h2>${a.q}쿼터 영상 <span class="hint">${a.startMs?hm(a.startMs)+(a.endMs?'~'+hm(a.endMs):''):''}</span></h2>${videoHtml(a)}</div>
   <div class="card"><h2>나 찾기</h2>${findHtml(a)}</div>
-  <div class="card"><h2>내 경기 분석 · ${a.q}쿼터</h2>${s?statHtml(a,s):`<p class="hint">이 쿼터에서 아직 내가 누구인지 몰라요. 위 <b>나 찾기</b>에서 내 네모를 눌러 주세요.</p>`}</div>
+  <div class="card"><h2>내 경기 분석 · ${a.q}쿼터</h2>${s?reportHtml(s,pitchOf(a),'q'+a.id)+cmpHtml(scopeRows('q',a.id),ST.me.pid,pitchOf(a),'이 쿼터'):`<p class="hint">이 쿼터에서 아직 내가 누구인지 몰라요. 위 <b>나 찾기</b>에서 내 네모를 눌러 주세요.</p>`}</div>
   ${teamHtml(a)}`;
 }
 function ytId(u){if(!u)return null;const m=String(u).match(/(?:youtu\.be\/|v=|embed\/|shorts\/|live\/)([\w-]{11})/);return m?m[1]:(/^[\w-]{11}$/.test(u)?u:null)}
@@ -198,29 +225,93 @@ function findHtml(a){
   const arm=ST.claimArm&&ST.claimArm.id===a.id?`<p class="msg warn">추적 ${esc(ST.claimArm.tid)}번이 나 맞나요? <button class="pri" data-act="claimYes" style="min-height:2.3rem">네, 나예요</button> <button data-act="claimNo" style="min-height:2.3rem">취소</button></p>`:'';
   return `<p class="hint" style="margin:0 0 .5rem">${mine.size?'노란 네모가 나예요.':'쿼터 첫 장면에서 <b>내 네모</b>를 눌러 주세요. 한 번 고르면 바꿀 수 없으니 잘 보고 눌러요.'} 확대해서 보려면 두 손가락으로 벌리세요.</p>${arm}<div class="frame" style="aspect-ratio:${f.w||16}/${f.h||9}"><img src="${src}" alt="${a.q}쿼터 첫 장면">${bx}</div><div class="leg"><span><i style="background:#60a5fa"></i>A팀</span><span><i style="background:#f87171"></i>B팀</span><span><i style="background:#facc15"></i>나</span><span>점선: 이미 주인이 있음</span></div>`;
 }
+// ---------- 경기 리포트 (쿼터 하나 또는 그날 합계) ----------
 const ZC={walk:'#94a3b8',jog:'#4ade80',run:'#f59e0b',sprint:'#dc2626'},ZN={walk:'걷기',jog:'조깅',run:'달리기',sprint:'전력 질주'};
-function zonesHtml(z){z=z||{};const t=Object.keys(ZC).reduce((s,k)=>s+(z[k]||0),0)||1;
-  return `<div class="bar">${Object.keys(ZC).map(k=>`<i style="width:${(z[k]||0)/t*100}%;background:${ZC[k]}"></i>`).join('')}</div><div class="leg">${Object.keys(ZC).map(k=>`<span><i style="background:${ZC[k]}"></i>${ZN[k]} ${km(z[k]||0)}</span>`).join('')}</div>`}
-function statHtml(a,s){
-  return `<div class="kpi">
-    <div><b>${km(s.distM)}</b><span>뛴 거리</span></div>
-    <div><b>${s.mins!=null?Math.round(s.mins)+'분':'-'}</b><span>출전 시간</span></div>
-    <div><b>${s.vmaxKmh!=null?s.vmaxKmh.toFixed(1):'-'}</b><span>최고 속도 km/h</span></div>
-    <div><b>${s.sprints!=null?s.sprints:'-'}회</b><span>스프린트</span></div>
-    <div><b>${pct(s.hiRatio)}</b><span>고강도 비율</span></div>
-    <div><b>${pct(s.coverPct)}</b><span>활동 범위</span></div></div>
-    <h3>속도 구간별 거리</h3>${zonesHtml(s.zones)}
-    <h3>히트맵과 평균 위치</h3><canvas class="pitch" data-ana="${esc(a.id)}" width="600" height="400"></canvas>
-    <div class="leg"><span><i style="background:#facc15"></i>내 평균 위치</span><span><i style="background:#fff;border:1px solid #888"></i>작전판 자리</span></div>
-    <p class="hint">${s.board&&s.devM!=null?`작전판 자리에서 평균 <b>${s.devM.toFixed(1)}m</b> 벗어나 있었어요.`:'작전판 자리가 없어 비교하지 않았어요.'} 왼쪽에서 오른쪽으로 공격하는 방향으로 맞춰 보여요.</p>`;
+const mmss=sec=>`${Math.floor(sec/60)}:${pad(Math.round(sec%60))}`;
+const pitchOf=a=>{const P=(a&&a.pitch)||{};return{w:P.w||100,h:P.h||64}};
+// 작전판 자리(없으면 평균 위치)로 수비·미드·공격을 나눈다. 오른쪽이 공격 방향
+function posGroup(s,P){const p=s&&(s.board||s.avg);if(!p)return null;const x=p[0]/P.w;return x<0.38?'DF':x<0.66?'MF':'FW'}
+const PGN={DF:'수비',MF:'미드',FW:'공격'};
+// 체력 유지: 5분 구간 거리의 뒤 절반 평균 ÷ 앞 절반 평균(쿼터마다 계산해 평균)
+// 마지막 구간이 5분보다 짧으면(쿼터 22분 등) 5분으로 환산하고, 1.5분 미만이면 뺀다
+function norm5(d,m){d=d.slice();if(nz(m)){const r=m-5*(d.length-1);if(r>0&&r<5){if(r<1.5)d.pop();else d[d.length-1]*=5/r}}return d}
+function endur(s){const G=((s&&s._d5)||[]).map((d,i)=>norm5(d,s._d5m&&s._d5m[i]));const R=G.filter(d=>d.length>=2).map(d=>{const h=Math.floor(d.length/2),f=mean(d.slice(0,h)),l=mean(d.slice(-h));return f?l/f:null}).filter(nz);return R.length?mean(R):null}
+
+function zonesHtml(z,zs){
+  let h='';
+  if(z){const t=Object.keys(ZC).reduce((s,k)=>s+(z[k]||0),0)||1;
+    h+=`<p class="hint" style="margin:.2rem 0">거리</p><div class="bar">${Object.keys(ZC).map(k=>`<i style="width:${(z[k]||0)/t*100}%;background:${ZC[k]}"></i>`).join('')}</div><div class="leg">${Object.keys(ZC).map(k=>`<span><i style="background:${ZC[k]}"></i>${ZN[k]} ${km(z[k]||0)}</span>`).join('')}</div>`}
+  if(zs){const t=Object.keys(ZC).reduce((s,k)=>s+(zs[k]||0),0)||1;
+    h+=`<p class="hint" style="margin:.5rem 0 .2rem">시간</p><div class="bar">${Object.keys(ZC).map(k=>`<i style="width:${(zs[k]||0)/t*100}%;background:${ZC[k]}"></i>`).join('')}</div><div class="leg">${Object.keys(ZC).map(k=>`<span><i style="background:${ZC[k]}"></i>${ZN[k]} ${mmss(zs[k]||0)}</span>`).join('')}</div>`}
+  return h?`<h3>속도 구간별 거리·시간</h3>${h}<p class="hint">걷기 7km/h 미만 · 조깅 7~14 · 달리기 14~20 · 전력 질주 20km/h 이상</p>`:'';
 }
-function teamHtml(a){const T=a.team||{},ks=Object.keys(T).sort();if(!ks.length)return '';
-  return `<div class="card"><h2>팀 모양</h2><table><tr><th>팀</th><th>수비 라인 높이</th><th>폭</th><th>길이</th><th>팀 전체 거리</th></tr>${ks.map(k=>{const t=T[k];return `<tr><td>${esc(k)}팀</td><td>${t.lineYm!=null?t.lineYm.toFixed(1)+'m':'-'}</td><td>${t.widthM!=null?t.widthM.toFixed(1)+'m':'-'}</td><td>${t.lengthM!=null?t.lengthM.toFixed(1)+'m':'-'}</td><td>${km(t.distM)}</td></tr>`}).join('')}</table></div>`}
+function kpiHtml(s){
+  const K=[[nz(s.distM)?km(s.distM):null,'뛴 거리'],[nz(s.mins)?Math.round(s.mins)+'분':null,'출전 시간'],[nz(s.workRate)?Math.round(s.workRate)+'m':null,'분당 거리'],
+    [nz(s.vmaxKmh)?s.vmaxKmh.toFixed(1):null,'최고 속도 km/h'],[nz(s.avgKmh)?s.avgKmh.toFixed(1):null,'평균 속도 km/h'],[nz(s.hsrM)?km(s.hsrM):null,'고속 거리 20+'],
+    [nz(s.sprintM)?km(s.sprintM):null,'전력 거리 25+'],[nz(s.sprints)?s.sprints+'회':null,'스프린트'],[nz(s.accels)?s.accels+'회':null,'가속'],
+    [nz(s.decels)?s.decels+'회':null,'감속'],[nz(s.hiRatio)?pct(s.hiRatio):null,'고강도 비율'],[nz(s.coverPct)?pct(s.coverPct):null,'활동 범위']].filter(k=>k[0]!=null);
+  return `<div class="kpi">${K.map(([v,l])=>`<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>`;
+}
+function speedSvg(s){
+  const S=s.speedSeries;if(!S||S.length<2)return '';
+  const W=320,H=140,pl=24,pb=18,pt=8,n=S.length,mx=Math.max(30,...S)+2;
+  const X=i=>pl+i/(n-1)*(W-pl-4),Y=v=>pt+(1-v/mx)*(H-pt-pb);
+  let g='';
+  [[10,'var(--line)'],[20,'#f59e0b'],[25,'#dc2626']].forEach(([v,c])=>{g+=`<line x1="${pl}" x2="${W-4}" y1="${Y(v)}" y2="${Y(v)}" stroke="${c}" stroke-dasharray="3 3"/><text x="${pl-3}" y="${Y(v)+3}" font-size="9" text-anchor="end" fill="var(--mute)">${v}</text>`});
+  let acc=0;(s._segs||[]).slice(0,-1).forEach(len=>{acc+=len;g+=`<line x1="${X(acc-.5)}" x2="${X(acc-.5)}" y1="${pt}" y2="${H-pb}" stroke="var(--mute)"/>`});
+  const pts=S.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  g+=`<polygon points="${X(0)},${Y(0)} ${pts} ${X(n-1)},${Y(0)}" fill="rgba(22,163,74,.15)"/><polyline points="${pts}" fill="none" stroke="#16a34a" stroke-width="1.4"/>`;
+  const mi=S.indexOf(Math.max(...S));g+=`<circle cx="${X(mi)}" cy="${Y(S[mi])}" r="3.5" fill="#dc2626"/>`;
+  const tot=n/6,step=tot>60?20:tot>30?10:5;for(let m=0;m<=tot;m+=step)g+=`<text x="${X(Math.min(n-1,m*6))}" y="${H-4}" font-size="9" text-anchor="middle" fill="var(--mute)">${m}분</text>`;
+  return `<h3>속도 그래프</h3><svg viewBox="0 0 ${W} ${H}" style="width:100%">${g}</svg><div class="leg"><span><i style="background:#f59e0b"></i>고속 20km/h</span><span><i style="background:#dc2626"></i>전력 25km/h</span><span>빨간 점: 최고 속도</span>${(s._segs||[]).length>1?'<span>세로선: 쿼터 경계</span>':''}</div>`;
+}
+function d5Html(s){
+  const G=s._d5||[];if(!G.length)return '';
+  const all=[].concat(...G),mx=Math.max(...all,1),multi=G.length>1,W=320,H=multi?132:120,pb=multi?30:18,pt=14,n=all.length+G.length-1,bw=W/n;
+  let g='',i=0;
+  G.forEach((d,gi)=>{const dn=norm5(d,s._d5m&&s._d5m[gi]),h2=Math.floor(dn.length/2),f=mean(dn.slice(0,h2)),l=mean(dn.slice(-h2)),drop=d.length>=2&&f&&l<f*0.9;
+    if(multi)g+=`<text x="${i*bw+2}" y="${H-3}" font-size="9" fill="var(--ink)" font-weight="700">${gi+1}Q</text>`;
+    d.forEach((v,j)=>{const x=i*bw,h=(H-pb-pt)*v/mx,late=drop&&j>=d.length-h2;
+      g+=`<rect x="${x+1.5}" y="${H-pb-h}" width="${Math.max(2,bw-3)}" height="${h}" rx="2" fill="${late?'#f59e0b':'#16a34a'}"/><text x="${x+bw/2}" y="${H-pb-h-3}" font-size="8.5" text-anchor="middle" fill="var(--mute)">${Math.round(v)}</text><text x="${x+bw/2}" y="${H-pb+11}" font-size="8.5" text-anchor="middle" fill="var(--mute)">${j*5}′</text>`;i++});i++});
+  const e=endur(s);let msg='',cls='';
+  if(nz(e)){const p=Math.round((1-e)*100);if(p>=15){msg=`후반 5분 구간 거리가 전반보다 ${p}% 줄었어요. 체력이 떨어지는 구간이에요.`;cls='warn'}else if(p>=5){msg=`후반에 거리가 ${p}% 조금 줄었어요.`}else{msg='끝까지 고르게 뛰었어요.';cls='ok'}}
+  return `<h3>5분 구간별 거리</h3><svg viewBox="0 0 ${W} ${H}" style="width:100%">${g}</svg><p class="hint" style="margin:0">막대 위 숫자는 5분 동안 뛴 거리(m)예요. 마지막 칸은 5분이 안 될 수 있어요.</p><p class="msg ${cls}" style="font-size:.9rem">${esc(msg)}</p>`;
+}
+function pitchLines(W,H){const c='#ffffffaa',w=1.5;return `<rect width="${W}" height="${H}" fill="#2f7d4a"/><rect x="3" y="3" width="${W-6}" height="${H-6}" fill="none" stroke="${c}" stroke-width="${w}"/><line x1="${W/2}" y1="3" x2="${W/2}" y2="${H-3}" stroke="${c}" stroke-width="${w}"/><circle cx="${W/2}" cy="${H/2}" r="${H*.14}" fill="none" stroke="${c}" stroke-width="${w}"/><rect x="3" y="${H*.2}" width="${W*.16}" height="${H*.6}" fill="none" stroke="${c}" stroke-width="${w}"/><rect x="${W-3-W*.16}" y="${H*.2}" width="${W*.16}" height="${H*.6}" fill="none" stroke="${c}" stroke-width="${w}"/>`}
+// 스프린트 경로 형식: Firestore 는 배열 안 배열을 못 넣으므로 {p:[x1,y1,x2,y2,...]} 를 기본으로 하고, [[x,y],...] 나 평평한 배열도 읽는다
+function toPath(p){if(!p)return [];if(Array.isArray(p)&&Array.isArray(p[0]))return p;const f=Array.isArray(p)?p:Array.isArray(p.p)?p.p:[];const o=[];for(let i=0;i+1<f.length;i+=2)o.push([f[i],f[i+1]]);return o}
+function sprintSvg(s,P){
+  const L=(s.sprintPaths||[]).map(toPath).filter(p=>p.length>=2);if(!L.length)return '';
+  const W=320,H=Math.round(W*P.h/P.w),X=v=>(v/P.w*W).toFixed(1),Y=v=>(v/P.h*H).toFixed(1);
+  let g=pitchLines(W,H);
+  L.forEach(p=>{g+=`<polyline points="${p.map(q=>X(q[0])+','+Y(q[1])).join(' ')}" fill="none" stroke="#facc15" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#bzArr)"/><circle cx="${X(p[0][0])}" cy="${Y(p[0][1])}" r="2.6" fill="#fff"/>`});
+  return `<h3>스프린트 경로 · ${L.length}회</h3><svg viewBox="0 0 ${W} ${H}" style="width:100%;border-radius:.6rem"><defs><marker id="bzArr" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto"><path d="M0,0L10,5L0,10z" fill="#facc15"/></marker></defs>${g}</svg><p class="hint">흰 점에서 출발해 화살표 쪽으로 달렸어요. 오른쪽이 공격 방향이에요.</p>`;
+}
+function segBar(o,keys,cols){const t=keys.reduce((s,[k])=>s+(o[k]||0),0)||1;return `<div class="bar sb">${keys.map(([k,l],i)=>{const p=(o[k]||0)/t*100;return `<i style="width:${p}%;background:${cols[i]}">${p>=14?l+' '+Math.round(p)+'%':''}</i>`}).join('')}</div><div class="leg">${keys.map(([k,l],i)=>`<span><i style="background:${cols[i]}"></i>${l} ${Math.round((o[k]||0)/t*100)}%</span>`).join('')}</div>`}
+function posHtml(s){
+  let h='';
+  if(s.thirds)h+=`<p class="hint" style="margin:.2rem 0">앞뒤 (운동장 3등분)</p>`+segBar(s.thirds,[['def','수비'],['mid','중앙'],['att','공격']],['#2563eb','#16a34a','#dc2626']);
+  if(s.lanes)h+=`<p class="hint" style="margin:.5rem 0 .2rem">좌우 (공격 방향 기준)</p>`+segBar(s.lanes,[['l','왼쪽'],['c','가운데'],['r','오른쪽']],['#0ea5e9','#64748b','#a855f7']);
+  if(nz(s.ownHalf))h+=`<p class="hint">우리 진영에 머문 시간 <b>${pct(s.ownHalf)}</b> · 상대 진영 ${pct(1-(s.ownHalf>1?s.ownHalf/100:s.ownHalf))}</p>`;
+  let d='';
+  if(s.dirs)d+=segBar(s.dirs,[['fwd','앞으로'],['back','뒤로'],['side','옆으로']],['#16a34a','#94a3b8','#f59e0b']);
+  if(nz(s.nearMate)){const v=s.nearMate,tip=v<8?'동료와 많이 붙어 있었어요. 간격을 조금 넓히면 패스 길이 더 생겨요.':v>20?'동료와 꽤 떨어져 있었어요. 지원 거리를 좁혀 보세요.':'동료와 적당한 간격을 유지했어요.';d+=`<p class="hint">가장 가까운 동료와 평균 <b>${v.toFixed(1)}m</b> · ${tip}</p>`}
+  return (h?`<h3>위치 분포</h3>${h}`:'')+(d?`<h3>이동 방향·동료와 거리</h3>${d}`:'');
+}
+// 리포트 전체. key 는 히트맵 캔버스가 데이터를 찾는 이름
+function reportHtml(s,P,key){
+  (ST.rep=ST.rep||{})[key]={s,P};
+  return kpiHtml(s)+speedSvg(s)+d5Html(s)+zonesHtml(s.zones,s.zoneSec)+
+    (s.heat||s.avg?`<h3>히트맵과 평균 위치</h3><canvas class="pitch" data-rep="${esc(key)}" width="600" height="${Math.round(600*P.h/P.w)}"></canvas>
+    <div class="leg"><span><i style="background:#facc15"></i>내 평균 위치</span><span><i style="background:#fff;border:1px solid #888"></i>작전판 자리</span></div>
+    <p class="hint">${s.board&&nz(s.devM)?`작전판 자리에서 평균 <b>${s.devM.toFixed(1)}m</b> 벗어나 있었어요.`:'작전판 자리가 없어 비교하지 않았어요.'} 오른쪽이 공격 방향이에요.</p>`:'')+
+    sprintSvg(s,P)+posHtml(s);
+}
 function drawPitch(cv){
-  const a=ST.ana.find(x=>x.id===cv.dataset.ana);if(!a)return;const s=statOf(a,ST.me.pid);if(!s)return;
-  const c=cv.getContext('2d'),W=cv.width,H=cv.height,P=a.pitch||{},pw=P.w||100,ph=P.h||64;
+  const r=ST.rep&&ST.rep[cv.dataset.rep];if(!r)return;const s=r.s,pw=r.P.w,ph=r.P.h;
+  const c=cv.getContext('2d'),W=cv.width,H=cv.height;
   c.fillStyle='#2f7d4a';c.fillRect(0,0,W,H);
-  const heat=s.heat||[];for(let r=0;r<8;r++)for(let k=0;k<12;k++){const v=heat[r*12+k]||0;if(v<=0)continue;c.fillStyle=`rgba(250,${Math.round(204-150*v)},21,${0.15+0.7*v})`;c.fillRect(k*W/12,r*H/8,W/12+1,H/8+1)}
+  const heat=s.heat||[];for(let y=0;y<8;y++)for(let k=0;k<12;k++){const v=heat[y*12+k]||0;if(v<=0)continue;c.fillStyle=`rgba(250,${Math.round(204-150*v)},21,${0.15+0.7*v})`;c.fillRect(k*W/12,y*H/8,W/12+1,H/8+1)}
   c.strokeStyle='#ffffffcc';c.lineWidth=2;c.strokeRect(4,4,W-8,H-8);c.beginPath();c.moveTo(W/2,4);c.lineTo(W/2,H-4);c.stroke();c.beginPath();c.arc(W/2,H/2,H*0.14,0,7);c.stroke();
   const bh=H*0.6,bw=W*0.16;c.strokeRect(4,(H-bh)/2,bw,bh);c.strokeRect(W-4-bw,(H-bh)/2,bw,bh);
   const X=m=>m/pw*W,Y=m=>m/ph*H;
@@ -228,30 +319,122 @@ function drawPitch(cv){
   if(s.board){c.fillStyle='#fff';c.beginPath();c.arc(X(s.board[0]),Y(s.board[1]),9,0,7);c.fill()}
   if(s.avg){c.fillStyle='#facc15';c.strokeStyle='#000';c.lineWidth=2;c.beginPath();c.arc(X(s.avg[0]),Y(s.avg[1]),11,0,7);c.fill();c.stroke()}
 }
+function teamHtml(a){const T=a.team||{},ks=Object.keys(T).sort();if(!ks.length)return '';
+  return `<div class="card"><h2>팀 모양</h2><table><tr><th>팀</th><th>수비 라인</th><th>폭</th><th>길이</th><th>팀 거리</th></tr>${ks.map(k=>{const t=T[k];return `<tr><td>${esc(k)}팀</td><td>${nz(t.lineYm)?t.lineYm.toFixed(1)+'m':'-'}</td><td>${nz(t.widthM)?t.widthM.toFixed(1)+'m':'-'}</td><td>${nz(t.lengthM)?t.lengthM.toFixed(1)+'m':'-'}</td><td>${km(t.distM)}</td></tr>`}).join('')}</table></div>`}
 
-// 내 기록 탭: 선수 카드, 지난 경기 비교, 부하 관리
-function byDay(pid){const m={};allRows().filter(r=>r.pid===pid).forEach(({a,s})=>{const d=m[a.date]=m[a.date]||{date:a.date,dist:0,mins:0,vmax:0,hi:0,q:0,spr:0,t:a.startMs||Date.parse(a.date)};d.dist+=s.distM||0;d.mins+=s.mins||0;d.vmax=Math.max(d.vmax,s.vmaxKmh||0);d.hi+=(s.hiRatio||0)*(s.distM||0);d.q++;d.spr+=s.sprints||0});return Object.values(m).sort((x,y)=>x.date.localeCompare(y.date))}
-function mineHtml(){
-  const D=byDay(ST.me.pid);
-  if(!D.length)return `<div class="card"><h2>${esc(ST.me.name)} 님 선수 카드</h2><p class="hint">아직 내 기록이 없어요. 경기 탭에서 <b>나 찾기</b>를 하면 기록이 쌓여요.</p></div>`;
-  const tot=D.reduce((s,d)=>s+d.dist,0),vmax=Math.max(...D.map(d=>d.vmax)),nq=D.reduce((s,d)=>s+d.q,0),mins=D.reduce((s,d)=>s+d.mins,0),hi=D.reduce((s,d)=>s+d.hi,0);
-  const card=`<div class="card"><h2>${esc(ST.me.name)} 님 선수 카드</h2><div class="kpi">
-    <div><b>${km(tot)}</b><span>누적 거리</span></div><div><b>${vmax.toFixed(1)}</b><span>최고 속도 km/h</span></div><div><b>${nq}쿼터</b><span>출전 (${D.length}일)</span></div>
-    <div><b>${mins?km(tot/mins*25):'-'}</b><span>25분당 거리</span></div><div><b>${pct(tot?hi/tot:0)}</b><span>고강도 비율</span></div><div><b>${D.reduce((s,d)=>s+d.spr,0)}회</b><span>누적 스프린트</span></div></div></div>`;
-  const last=D.slice(-6).reverse();
-  const arrow=(v,p)=>p==null?'':v>p*1.03?' <span class="up">▲</span>':v<p*0.97?' <span class="dn">▼</span>':'';
-  const cmp=`<div class="card"><h2>지난 경기 비교</h2><table><tr><th>날짜</th><th>Q</th><th>거리</th><th>25분당</th><th>최고km/h</th><th>고강도</th></tr>${last.map((d,i)=>{const p=last[i+1],r=d.mins?d.dist/d.mins*25:0,pr=p&&p.mins?p.dist/p.mins*25:null;return `<tr><td>${dLabel(d.date)}</td><td>${d.q}</td><td>${km(d.dist)}</td><td>${km(r)}${arrow(r,pr)}</td><td>${d.vmax.toFixed(1)}${arrow(d.vmax,p&&p.vmax)}</td><td>${pct(d.dist?d.hi/d.dist:0)}</td></tr>`}).join('')}</table><p class="hint">▲▼는 바로 앞 경기와 비교예요. 쿼터 수가 달라서 <b>25분당 거리</b>로 비교해요.</p></div>`;
-  return card+cmp+loadHtml(D);
+// ---------- 비교 (같은 쿼터 또는 같은 날) ----------
+function groupRows(rows){const m={};rows.forEach(r=>{(m[r.pid]=m[r.pid]||[]).push(r.s)});return Object.entries(m).map(([pid,L])=>({pid,s:mergeStats(L),n:L.length}))}
+function scopeRows(kind,key){const R=allRows();return groupRows(kind==='q'?R.filter(r=>r.a.id===key):R.filter(r=>r.a.date===key))}
+const per25=(s,k)=>nz(s[k])&&s.mins?s[k]/s.mins*25:null;
+const CMP=[['분당 거리',s=>s.workRate,v=>Math.round(v)+'m'],['최고 속도',s=>s.vmaxKmh,v=>v.toFixed(1)],['고속 거리/25분',s=>per25(s,'hsrM'),v=>Math.round(v)+'m'],
+  ['스프린트/25분',s=>per25(s,'sprints'),v=>v.toFixed(1)],['가속·감속/25분',s=>nz(s.accels)&&s.mins?((s.accels||0)+(s.decels||0))/s.mins*25:null,v=>v.toFixed(1)],['활동 범위',s=>s.coverPct,pct]];
+function cmpHtml(rows,pid,P,title){
+  const me=rows.find(r=>r.pid===pid),others=rows.filter(r=>r.pid!==pid);if(!me||!others.length)return '';
+  const g=posGroup(me.s,P),same=g?others.filter(r=>posGroup(r.s,P)===g):[];
+  const av=(L,f)=>{const v=L.map(r=>f(r.s)).filter(nz);return v.length?mean(v):null};
+  const rowsH=CMP.map(([l,f,fmt])=>{const m=f(me.s);if(!nz(m))return '';const t=av(others,f),p=av(same,f);const cls=nz(t)?(m>=t*1.05?'up':m<=t*0.95?'dn':''):'';
+    return `<tr><td>${l}</td><td class="${cls}"><b>${fmt(m)}</b></td><td>${nz(p)?fmt(p):'-'}</td><td>${nz(t)?fmt(t):'-'}</td></tr>`}).join('');
+  return `<h3>비교 · ${esc(title)}</h3><table><tr><th>항목</th><th>나</th><th>${g?PGN[g]:'포지션'} 평균</th><th>축구회 평균</th></tr>${rowsH}</table>
+  <p class="hint">${g?`같은 포지션(${PGN[g]}) ${same.length}명, `:''}축구회 ${others.length}명과 비교 · 초록은 평균보다 5% 이상 높음, 빨강은 낮음. 포지션은 작전판 자리(없으면 평균 위치)로 나눴어요.</p>`;
+}
+// ---------- 내 기록 탭: 선수 카드(능력치), 배지, 경기 리포트, 시즌 추이, 지난 경기, 부하 관리 ----------
+// 내 날짜별 기록(그날 쿼터를 합친 값)
+function dayStats(pid){const m={};allRows().filter(r=>r.pid===pid).forEach(r=>{(m[r.a.date]=m[r.a.date]||[]).push(r)});
+  return Object.keys(m).sort().map(d=>({date:d,q:m[d].length,s:mergeStats(m[d].map(r=>r.s)),P:pitchOf(m[d][0].a)}))}
+// 능력치 6개 축. 값이 클수록 좋게 맞춘다(위치 지키기는 벗어난 거리에 - 를 붙임)
+const AX=[['spd','속도'],['wr','활동량'],['exp','폭발력'],['end','지구력'],['dis','위치 지키기'],['spc','공간 활용']];
+function seasonTable(){
+  const m={};allRows().forEach(r=>{(m[r.pid]=m[r.pid]||[]).push(r.s)});
+  return Object.entries(m).map(([pid,L])=>{const s=mergeStats(L),en=L.map(x=>endur(mergeStats([x]))).filter(nz);
+    return {pid,s,n:L.length,ax:{spd:s.vmaxKmh||null,wr:nz(s.workRate)?s.workRate:null,exp:s.mins&&(nz(s.sprints)||nz(s.accels))?((s.sprints||0)+(s.accels||0))/s.mins*25:null,
+      end:en.length?mean(en):null,dis:nz(s.devM)?-s.devM:null,spc:nz(s.coverPct)?s.coverPct:null}}});
+}
+// 축구회 회원 분포에서의 백분위를 1~99 점수로
+function pctScore(v,arr){if(!nz(v))return null;const a=arr.filter(nz);if(a.length<2)return 50;let lo=0,eq=0;a.forEach(x=>{if(x<v)lo++;else if(x===v)eq++});return Math.round((lo+0.5*eq)/a.length*98)+1}
+function radarSvg(sc){
+  const cx=150,cy=138,R=92,n=AX.length,pt=(i,v)=>{const a=-Math.PI/2+i*2*Math.PI/n;return[+(cx+Math.cos(a)*R*v/99).toFixed(1),+(cy+Math.sin(a)*R*v/99).toFixed(1)]};
+  let g='';[25,50,75,99].forEach(l=>{g+=`<polygon points="${AX.map((_,i)=>pt(i,l).join(',')).join(' ')}" fill="none" stroke="var(--line)" ${l===50?'stroke-dasharray="4 3" stroke="var(--mute)"':''}/>`});
+  AX.forEach((_,i)=>{const[x,y]=pt(i,99);g+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--line)"/>`});
+  g+=`<polygon points="${AX.map(([k],i)=>pt(i,sc[k]||0).join(',')).join(' ')}" fill="rgba(22,163,74,.35)" stroke="#16a34a" stroke-width="2"/>`;
+  AX.forEach(([k,l],i)=>{const[x,y]=pt(i,121);g+=`<text x="${x}" y="${y-4}" text-anchor="middle" font-size="12" fill="var(--ink)">${l}</text><text x="${x}" y="${y+11}" text-anchor="middle" font-size="13" font-weight="800" fill="#16a34a">${sc[k]==null?'-':sc[k]}</text>`});
+  return `<svg viewBox="0 0 300 280" style="width:100%;max-width:340px;display:block;margin:0 auto">${g}</svg>`;
+}
+function cardHtml(D){
+  const T=seasonTable(),me=T.find(r=>r.pid===ST.me.pid);if(!me)return '';
+  const sc={};AX.forEach(([k])=>{sc[k]=pctScore(me.ax[k],T.map(r=>r.ax[k]))});
+  const vs=AX.map(([k])=>sc[k]).filter(nz),ovr=vs.length?Math.round(mean(vs)):null,s=me.s,g=posGroup(s,D[D.length-1].P);
+  return `<div class="card"><div class="row" style="align-items:center;gap:.8rem"><div class="ovr"><b>${ovr??'-'}</b><span>종합</span></div>
+    <div style="flex:1"><h2 style="margin:0">${esc(ST.me.name)}</h2><p class="hint" style="margin:0">${g?PGN[g]+' · ':''}${D.length}경기 ${me.n}쿼터 출전</p></div></div>
+    ${radarSvg(sc)}
+    <p class="hint" style="text-align:center;margin-top:0">축구회 회원 ${T.length}명 중 백분위 점수예요(점선 50 = 축구회 중간).</p>
+    <div class="kpi"><div><b>${km(s.distM)}</b><span>누적 거리</span></div><div><b>${(s.vmaxKmh||0).toFixed(1)}</b><span>최고 속도 km/h</span></div><div><b>${nz(s.workRate)?Math.round(s.workRate)+'m':'-'}</b><span>평균 분당 거리</span></div>
+    <div><b>${nz(s.sprints)?s.sprints+'회':'-'}</b><span>누적 스프린트</span></div><div><b>${nz(s.hsrM)?km(s.hsrM):'-'}</b><span>누적 고속 거리</span></div><div><b>${s.mins?km(s.distM/s.mins*25):'-'}</b><span>25분당 거리</span></div></div>
+    <details class="axh"><summary>점수는 이렇게 매겨요</summary><p class="hint">속도: 최고 속도 · 활동량: 분당 거리 · 폭발력: 25분당 스프린트+가속 · 지구력: 쿼터 후반 거리 유지율 · 위치 지키기: 작전판 자리에서 벗어난 거리(작을수록 높음) · 공간 활용: 활동 범위</p></details></div>`;
+}
+function badgesHtml(D){
+  const last=D[D.length-1],s=last.s,B=[],day=scopeRows('d',last.date);
+  const recent=Date.now()-Date.parse(last.date+'T12:00')<7*864e5,when=recent?'이번 주':dLabel(last.date);
+  const top=f=>{const L=day.filter(r=>nz(f(r.s)));return L.length>=2&&nz(f(s))&&L.every(r=>f(r.s)<=f(s))};
+  if(top(x=>x.distM))B.push(['🏃',`${when} 최다 거리`,km(s.distM)]);
+  if(top(x=>x.vmaxKmh))B.push(['⚡',`${when} 최고 속도`,s.vmaxKmh.toFixed(1)+'km/h']);
+  if(top(x=>x.sprints))B.push(['🔥','스프린트왕',s.sprints+'회']);
+  if(top(x=>x.workRate))B.push(['💪','최고 활동량',Math.round(s.workRate)+'m/분']);
+  if(D.length>1){const P=D.slice(0,-1);
+    if((s.vmaxKmh||0)>Math.max(...P.map(d=>d.s.vmaxKmh||0)))B.push(['🚀','최고 속도 개인 기록 갱신',s.vmaxKmh.toFixed(1)+'km/h']);
+    if((s.distM||0)>Math.max(...P.map(d=>d.s.distM||0)))B.push(['📈','하루 거리 개인 기록 갱신',km(s.distM)])}
+  let streak=0;for(const d of dates()){if(D.some(x=>x.date===d))streak++;else break}
+  if(streak>=3)B.push(['📅',`${streak}경기 연속 출전`,'']);
+  const qn=sortedAna().filter(a=>a.date===last.date).length;if(qn>=3&&last.q>=qn)B.push(['🛡️','전 쿼터 출전',qn+'쿼터']);
+  const e=endur(s);if(nz(e)&&e>=0.97)B.push(['🔋','끝까지 지치지 않음','후반 거리 유지']);
+  return `<div class="card"><h2>배지 · ${dLabel(last.date)}</h2>${B.length?`<div class="badges">${B.map(([i,t,v])=>`<div><span class="bi">${i}</span><b>${esc(t)}</b>${v?`<small>${esc(v)}</small>`:''}</div>`).join('')}</div>`:'<p class="hint">이번 경기에서 받은 배지가 없어요. 다음 경기에서 도전해 보세요!</p>'}</div>`;
+}
+function trendSvg(D,f,fmt,label,unit){
+  const V=D.map(d=>f(d.s));if(V.filter(nz).length<1)return '';
+  const W=320,H=96,pl=6,pr=6,pt=18,pb=16,n=D.length,vs=V.filter(nz),mx=Math.max(...vs),mn=Math.min(...vs),rg=mx-mn||1;
+  const X=i=>n>1?pl+i/(n-1)*(W-pl-pr):W/2,Y=v=>pt+(1-(v-mn)/rg)*(H-pt-pb);
+  const pts=V.map((v,i)=>nz(v)?`${X(i).toFixed(1)},${Y(v).toFixed(1)}`:null).filter(Boolean).join(' ');
+  const pb_i=V.indexOf(mx),last=V[n-1],isPB=n>1&&pb_i===n-1;
+  let g=`<polyline points="${pts}" fill="none" stroke="#16a34a" stroke-width="2"/>`;
+  V.forEach((v,i)=>{if(nz(v))g+=`<circle cx="${X(i)}" cy="${Y(v)}" r="${i===pb_i?4.5:2.8}" fill="${i===pb_i?'#facc15':'#16a34a'}" stroke="${i===pb_i?'#a16207':'none'}"/>`});
+  g+=`<text x="${Math.min(W-30,Math.max(30,X(pb_i)))}" y="${Y(mx)-7}" font-size="10" text-anchor="middle" fill="#a16207" font-weight="700">최고 ${fmt(mx)}</text>`;
+  D.forEach((d,i)=>{if(n<=8||i%Math.ceil(n/8)===0||i===n-1)g+=`<text x="${X(i)}" y="${H-3}" font-size="8.5" text-anchor="${n>1&&i===0?'start':n>1&&i===n-1?'end':'middle'}" fill="var(--mute)">${+d.date.slice(5,7)}/${+d.date.slice(8)}</text>`});
+  return `<div class="trend"><p><b>${label}</b> <span class="hint">최근 ${nz(last)?fmt(last):'-'}${unit}</span>${isPB?' <span class="pill on">개인 최고 갱신</span>':''}</p><svg viewBox="0 0 ${W} ${H}" style="width:100%">${g}</svg></div>`;
+}
+function trendHtml(D){
+  if(D.length<2)return `<div class="card"><h2>시즌 추이</h2><p class="hint">두 경기 이상 기록이 쌓이면 추이를 보여 드려요.</p></div>`;
+  return `<div class="card"><h2>시즌 추이</h2>${trendSvg(D,s=>s.distM,v=>(v/1000).toFixed(1),'뛴 거리','km')}${trendSvg(D,s=>s.vmaxKmh,v=>v.toFixed(1),'최고 속도','km/h')}${trendSvg(D,s=>s.sprints,v=>Math.round(v),'스프린트','회')}${trendSvg(D,s=>s.workRate,v=>Math.round(v),'분당 거리','m')}<p class="hint">노란 점이 개인 최고 기록(PB)이에요.</p></div>`;
+}
+function pastHtml(D){
+  const last=D.slice(-6).reverse(),arrow=(v,p)=>!nz(v)||!nz(p)?'':v>p*1.03?' <span class="up">▲</span>':v<p*0.97?' <span class="dn">▼</span>':'';
+  return `<div class="card"><h2>지난 경기 비교</h2><table><tr><th>날짜</th><th>Q</th><th>거리</th><th>분당</th><th>최고km/h</th><th>스프린트</th></tr>${last.map((d,i)=>{const p=last[i+1],s=d.s,ps=p&&p.s;
+    return `<tr><td>${dLabel(d.date)}</td><td>${d.q}</td><td>${km(s.distM)}</td><td>${nz(s.workRate)?Math.round(s.workRate):'-'}${arrow(s.workRate,ps&&ps.workRate)}</td><td>${(s.vmaxKmh||0).toFixed(1)}${arrow(s.vmaxKmh,ps&&ps.vmaxKmh)}</td><td>${nz(s.sprints)?s.sprints:'-'}${arrow(ps&&s.sprints/s.mins,ps&&ps.sprints/ps.mins)}</td></tr>`}).join('')}</table><p class="hint">▲▼는 바로 앞 경기와 비교예요. 쿼터 수가 달라서 분당 거리와 분당 스프린트로 비교해요.</p></div>`;
 }
 function loadHtml(D){
-  // 최근 4주를 주 단위로 묶고, 이번 주가 4주 평균보다 크게 늘면 주의
-  const now=Date.now(),W=7*864e5,wk=[0,0,0,0];
-  D.forEach(d=>{const t=Date.parse(d.date+'T12:00');const i=Math.floor((now-t)/W);if(i>=0&&i<4)wk[i]+=d.dist});
-  const avg=(wk[0]+wk[1]+wk[2]+wk[3])/4,ratio=avg?wk[0]/avg:null,mx=Math.max(...wk,1);
+  // 최근 1주(급성) ÷ 최근 4주 주평균(만성). 1.3을 넘으면 주의, 1.5를 넘으면 부상 위험이 커진다
+  const now=Date.now(),wk=[0,0,0,0],hs=[0,0,0,0];
+  D.forEach(d=>{const i=Math.floor((now-Date.parse(d.date+'T12:00'))/(7*864e5));if(i>=0&&i<4){wk[i]+=d.s.distM||0;hs[i]+=d.s.hsrM||0}});
+  const chronic=(wk[0]+wk[1]+wk[2]+wk[3])/4,ratio=chronic?wk[0]/chronic:null,mx=Math.max(...wk,1),hasH=hs.some(x=>x>0);
   let msg='최근 4주 기록이 쌓이면 부하를 알려 드려요.',cls='';
-  if(ratio!=null&&wk.filter(x=>x>0).length>=2){if(ratio>1.3){msg=`이번 주 부하가 4주 평균의 ${ratio.toFixed(1)}배예요. 갑자기 늘면 다치기 쉬워요. 다음 경기는 출전 시간을 조금 줄여 보세요.`;cls='bad'}else if(ratio<0.8){msg=`이번 주는 평소보다 적게 뛰었어요(4주 평균의 ${ratio.toFixed(1)}배).`;cls='warn'}else{msg=`적당해요. 이번 주 부하는 4주 평균의 ${ratio.toFixed(1)}배예요.`;cls='ok'}}
-  const L=['이번 주','1주 전','2주 전','3주 전'];
-  return `<div class="card"><h2>부하 관리</h2>${[3,2,1,0].map(i=>`<div class="row" style="margin:.25rem 0"><span style="flex:0 0 4.2rem;font-size:.85rem">${L[i]}</span><div class="bar" style="flex:1"><i style="width:${wk[i]/mx*100}%;background:${i===0?'var(--go)':'#94a3b8'}"></i></div><span style="flex:0 0 4.5rem;text-align:right;font-size:.85rem">${km(wk[i])}</span></div>`).join('')}<p class="msg ${cls}">${esc(msg)}</p><p class="hint">최근 4주 누적 ${km(wk.reduce((s,x)=>s+x,0))} · 뛴 거리 기준</p></div>`;
+  if(nz(ratio)&&wk.filter(x=>x>0).length>=2){
+    if(ratio>1.5){msg=`최근 1주 부하가 4주 평균의 ${ratio.toFixed(2)}배로 급격히 늘었어요. 부상 위험이 커요. 다음 경기는 출전 시간을 줄이세요.`;cls='bad'}
+    else if(ratio>1.3){msg=`최근 1주 부하가 4주 평균의 ${ratio.toFixed(2)}배예요. 갑자기 늘면 다치기 쉬워요. 조금 줄여 보세요.`;cls='warn'}
+    else if(ratio<0.8){msg=`최근 1주는 평소보다 적게 뛰었어요(4주 평균의 ${ratio.toFixed(2)}배). 다시 늘릴 때는 천천히 늘려요.`;cls='warn'}
+    else{msg=`적정해요. 최근 1주 부하는 4주 평균의 ${ratio.toFixed(2)}배예요.`;cls='ok'}}
+  const L=['최근 1주','1주 전','2주 전','3주 전'],gx=nz(ratio)?Math.min(100,ratio/2*100):null;
+  return `<div class="card"><h2>부하 관리</h2>
+    ${nz(gx)?`<div class="gauge"><i style="left:0;width:40%;background:#94a3b8"></i><i style="left:40%;width:25%;background:#16a34a"></i><i style="left:65%;width:10%;background:#f59e0b"></i><i style="left:75%;width:25%;background:#dc2626"></i><b style="left:${gx}%"></b></div><div class="gl"><span style="left:0">0</span><span style="left:40%">0.8</span><span style="left:52%">적정</span><span style="left:65%">1.3</span><span style="left:75%">1.5</span><span style="left:100%">2+</span></div>`:''}
+    <p class="msg ${cls}">${esc(msg)}</p>
+    ${[3,2,1,0].map(i=>`<div class="row" style="margin:.25rem 0"><span style="flex:0 0 4.2rem;font-size:.85rem">${L[i]}</span><div class="bar" style="flex:1"><i style="width:${wk[i]/mx*100}%;background:${i===0?'var(--go)':'#94a3b8'}"></i></div><span style="flex:0 0 4.6rem;text-align:right;font-size:.8rem;line-height:1.2">${km(wk[i])}${hasH?`<br><small class="hint">고속 ${km(hs[i])}</small>`:''}</span></div>`).join('')}
+    <p class="hint">최근 4주 누적 ${km(wk.reduce((s,x)=>s+x,0))} · 주평균 ${km(chronic)} · 뛴 거리 기준</p></div>`;
+}
+function mineHtml(){
+  const D=dayStats(ST.me.pid);
+  if(!D.length)return `<div class="card"><h2>${esc(ST.me.name)} 님 선수 카드</h2><p class="hint">아직 내 기록이 없어요. 경기 탭에서 <b>나 찾기</b>를 하면 기록이 쌓여요.</p></div>`;
+  const d=D.find(x=>x.date===ST.mday)||D[D.length-1];
+  const sel=`<select data-mday>${D.slice().reverse().map(x=>`<option value="${x.date}" ${x.date===d.date?'selected':''}>${dLabel(x.date)} · ${x.q}쿼터</option>`).join('')}</select>`;
+  return cardHtml(D)+badgesHtml(D)+
+    `<div class="card"><h2>경기 리포트</h2>${sel}<p class="hint" style="margin:.3rem 0 .6rem">그날 뛴 쿼터를 모두 합친 기록이에요. 쿼터별로는 경기 탭에서 볼 수 있어요.</p>${reportHtml(d.s,d.P,'d'+d.date)}${cmpHtml(scopeRows('d',d.date),ST.me.pid,d.P,'그날')}</div>`+
+    trendHtml(D)+pastHtml(D)+loadHtml(D);
 }
 
 // 순위 탭
@@ -377,7 +560,7 @@ document.addEventListener('click',e=>{
   else if(k==='oldAdmin'){try{sessionStorage.setItem('bz-admin','1')}catch(err){}location.href='index.html'}
   else if(k==='mark')addMark();else if(k==='saveYt')saveYt();else if(k==='savePid')savePid();
 });
-document.addEventListener('change',e=>{const d=e.target.closest('[data-date]');if(d){const L=sortedAna().filter(x=>x.date===d.value);if(L.length)ST.sel=L[0].id;ST.claimArm=null;render()}});
+document.addEventListener('change',e=>{const md=e.target.closest('[data-mday]');if(md){ST.mday=md.value;render();return}const d=e.target.closest('[data-date]');if(d){const L=sortedAna().filter(x=>x.date===d.value);if(L.length)ST.sel=L[0].id;ST.claimArm=null;render()}});
 
 // ---------- 불러오기 ----------
 async function loadClaims(id){
