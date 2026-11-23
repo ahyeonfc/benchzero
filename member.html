@@ -110,6 +110,7 @@ details.more{margin-top:.7rem}details.more>summary{cursor:pointer;font-weight:80
 .dot{display:inline-block;width:.75rem;height:.75rem;border-radius:50%;margin-right:.3rem;vertical-align:-1px;box-shadow:0 0 0 1px #0003}
 .frame i.bx{position:absolute;border:2px solid #fff9;border-radius:3px}.frame i.bx.A{border-color:#60a5fa}.frame i.bx.B{border-color:#f87171}.frame i.bx.me{border:3px solid #facc15}
 .banner{display:flex;align-items:center;gap:.5rem;background:light-dark(#fff7ed,#2a1e12);border:1px solid #f59e0b66;border-radius:.9rem;padding:.5rem .6rem .5rem .9rem;margin-bottom:.8rem;font-size:.92rem}.banner span{flex:1}.banner button{min-height:2.3rem;padding:0 .8rem}.banner .x{border:0;background:transparent;font-size:1.3rem;padding:0 .3rem;color:var(--mute)}
+.nt{font-size:.8rem}.nt th,.nt td{padding:.3rem .25rem;text-align:center}.nt small{color:var(--mute);font-weight:400}
 .axh summary{cursor:pointer;color:var(--mute);font-size:.85rem}
 .seg{display:flex;gap:.3rem;margin-bottom:.6rem}.seg button{flex:1;min-height:2.3rem;font-size:.85rem;padding:0 .3rem}.seg button.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 </style>
@@ -138,7 +139,7 @@ const pct=v=>v==null?'-':Math.round(v>1?v:v*100)+'%';
 
 // 상태
 const ST={conf:null,test:false,me:null,P:null,F:null,db:null,auth:null,A:null,user:null,admin:false,linkAdmin:false,
-  ana:[],claims:{},sel:null,tab:'game',rank:'q',cam:null,marks:[],msg:'',mcls:'',q:'',confirm:null,err:'',mine:{},crops:{},cropLd:{},sugNo:{},reFind:{},pick:{},fteam:{},att:{},attSet:{},more:{},prof:{}};
+  ana:[],claims:{},norm:null,rankAge:false,sel:null,tab:'game',rank:'q',cam:null,marks:[],msg:'',mcls:'',q:'',confirm:null,err:'',mine:{},crops:{},cropLd:{},sugNo:{},reFind:{},pick:{},fteam:{},att:{},attSet:{},more:{},prof:{}};
 
 // 축구회 코드 읽기: 출석(checkin.html)과 같은 저장 키(bz-ci, bz-me)를 쓴다
 function readConf(){
@@ -584,6 +585,46 @@ function absScore(ref,v){
   const[x0,y0]=P[i],[x1,y1]=P[i+1],y=y0+(y1-y0)*(v-x0)/((x1-x0)||1);
   return Math.round(Math.max(30,Math.min(99,y)));
 }
+// ---------- 나이대별 기준 ----------
+// 나이대: 20·30·40·50·60·70(70대 이상). 나이가 없으면 40대 기준
+const AGE_BANDS=[20,30,40,50,60,70],AGE_DEFAULT=40,AGE_COMMON=30;   // AGE_COMMON: "전 연령 같은 기준" 으로 쓸 나이대
+// 나이대별 "그 나이대의 평범한 회원 값" = 65점(은 경계) 기준점. 쿼터 값은 25분 환산.
+// 근거: 35세 이상 아마추어(평균 45세) 연구에서 경기 중 분당 약 70m. 속도 계열은 나이에 따라 더 크게 떨어지게 잡았다.
+// 추정값, 우리 축구회 기록이 쌓이면 다시 맞춤(운영진 관리 화면 "기준 다시 맞추기" → pub/{code}/conf/norm 에 저장하면 이 값을 덮어씀)
+const AGE_NORM={
+  mpm:{20:85,30:80,40:72,50:65,60:58,70:50},               // 분당 거리 m/min (강도도 같은 값)
+  vol:{20:2125,30:2000,40:1800,50:1625,60:1450,70:1250},   // 운동량 m/쿼터
+  cov:{20:28,30:27,40:25,50:23,60:21,70:19},               // 활동 범위 %
+  agi:{20:28,30:26,40:23,50:20,60:17,70:14},               // 방향 전환 회/쿼터
+  stm:{20:.90,30:.89,40:.88,50:.87,60:.86,70:.85},         // 스태미나(뒤 절반 ÷ 앞 절반)
+  hhk:{20:.80,30:.78,40:.75,50:.72,60:.70,70:.68},         // 후반 고강도 유지
+  apo:{20:1.5,30:1.4,40:1.2,50:1.0,60:.8,70:.6},           // 상대 박스 진입 회/쿼터
+  // 속도 계열(나이에 따라 더 크게 떨어짐)
+  top:{20:27,30:26,40:24.5,50:23,60:21,70:19},             // 최고 속도 km/h
+  hsr:{20:220,30:180,40:120,50:80,60:45,70:20},            // 고속 거리(시속 20km 이상) m/쿼터
+  spr:{20:60,30:45,40:25,50:12,60:5,70:2},                 // 전력 질주 거리(시속 25km 이상) m/쿼터
+  spf:{20:3,30:2.4,40:1.5,50:.9,60:.4,70:.15},             // 스프린트 회/쿼터
+  acc:{20:14,30:12,40:10,50:8,60:6,70:4.5},                // 가속 회/쿼터
+  brk:{20:14,30:12,40:10,50:8,60:6,70:4.5},                // 감속(제동) 회/쿼터
+  rsa:{20:1,30:.8,40:.5,50:.3,60:.15,70:.05}               // 반복 스프린트 회/쿼터
+};
+// 기준점 모양: [기준값에 대한 비율, 점수]. 1(=그 나이대 평범한 값) 이 65점
+const NORM_SHAPE={
+  wide:[[.6,40],[.8,52],[1,65],[1.25,80],[1.5,92]],         // 거리·횟수
+  tight:[[.82,40],[.92,52],[1,65],[1.1,80],[1.2,92]],       // 최고 속도·유지율처럼 차이가 작은 값
+  count:[[0,35],[1,65],[2.2,85],[3.5,95]]                   // 0 이 흔한 작은 횟수·거리
+};
+const SHAPE_OF={top:'tight',stm:'tight',hhk:'tight',spr:'count',spf:'count',rsa:'count',apo:'count'};
+const ageBand=a=>{a=+a;if(!a)return null;return a>=70?70:a<20?20:Math.floor(a/10)*10};
+function ageOf(pid){const n=(ST.P&&ST.P.names||[]).find(x=>x.id===pid);return n?ageBand(n.age):null}
+// 운영진이 적용한 기준(conf/norm)이 있으면 그 값, 없으면 AGE_NORM
+const normOf=(key,band)=>{const c=ST.norm&&ST.norm[key];return (c&&c[band])??(AGE_NORM[key]&&AGE_NORM[key][band])};
+// 세부 항목 점수: 나이대 기준이 있는 항목은 그 나이대 기준값의 비율로, 위치 계열(작전판 자리·라인·간격)은 나이와 상관없이 ABS_REF 로
+function scoreFor(key,v,band){
+  const N=AGE_NORM[key]?normOf(key,band||AGE_DEFAULT):null;
+  if(!N)return absScore(ABS_REF[key],v);
+  if(!nz(v))return null;return absScore(NORM_SHAPE[SHAPE_OF[key]||'wide'].map(([r,s])=>[r*N,s]),v);
+}
 // 능력치 표: 큰 능력치 아래 세부 능력치(키, 이름, 설명, 기준표, 값 계산, 참고 표시, 보이는 포지션).
 // 큰 능력치 = 보이는 세부 점수의 평균. 값이 없거나 내 포지션에 해당 없는 세부 항목은 숨긴다
 const CARD_AX={
@@ -634,7 +675,7 @@ const OVR_W={
 // 카드 등급(종합 점수 기준)
 const TIER=[[75,'gold','금'],[65,'silver','은'],[0,'bronze','동']];
 // asOf 날짜 기준 최근 30일(asOf 당일은 빼고) 내 기록으로 카드를 계산
-function cardData(pid,asOf){
+function cardData(pid,asOf,band){
   const from=addDays(asOf,-CARD_DAYS),R=allRows().filter(r=>r.pid===pid&&r.a.date>=from&&r.a.date<asOf);
   if(!R.length)return null;
   const L=R.map(r=>r.s),s=mergeStats(L),en=L.map(x=>endur(mergeStats([x]))).filter(nz);
@@ -642,7 +683,7 @@ function cardData(pid,asOf){
   // 후반 고강도 유지: 쿼터마다 hsrHalves[뒤]/[앞] 을 구해 평균(앞 절반이 0인 쿼터는 뺌)
   const hh=L.map(x=>Array.isArray(x.hsrHalves)&&x.hsrHalves[0]>0?x.hsrHalves[1]/x.hsrHalves[0]:null).filter(nz);s._hh=hh.length?mean(hh):null;
   const ver=L.some(x=>x.v2&&Object.keys(x.v2).length)?2:CARD_V,AXS=CARD_AX[ver],g=posGroup(s,pitchOf(R[R.length-1].a)),sc={},sub={};
-  AXS.forEach(ax=>{const out=[];ax.subs.forEach(su=>{if(su.only&&g&&!su.only.includes(g))return;const v=absScore(ABS_REF[su.ab||su.k],su.f(s));if(nz(v))out.push(Object.assign({v},su))});
+  AXS.forEach(ax=>{const out=[];ax.subs.forEach(su=>{if(su.only&&g&&!su.only.includes(g))return;const v=scoreFor(su.ab||su.k,su.f(s),band);if(nz(v))out.push(Object.assign({v},su))});
     sub[ax.k]=out;sc[ax.k]=out.length?Math.round(mean(out.map(x=>x.v))):null});
   const W=g?OVR_W[ver][g]:null;let t=0,w=0;
   AXS.forEach(ax=>{if(!nz(sc[ax.k]))return;const wi=W?(W[ax.k]||0):1;t+=sc[ax.k]*wi;w+=wi});
@@ -666,9 +707,10 @@ const GOODBAD={acc:['짧게 치고 나가는 힘이 좋아요','치고 나가는
   lin:['수비 라인을 잘 맞춰요','수비 라인에서 자주 벗어나요'],apo:['상대 박스에 자주 들어가요','상대 박스 진입이 적어요'],gap:['동료와 간격이 좋아요','동료와 너무 붙거나 멀어요']};
 const md=ds=>`${+ds.slice(5,7)}/${+ds.slice(8)}`;
 function cardHtml(){
-  const today=todayStr(),C=cardData(ST.me.pid,today);
+  // 내 나이대 기준(기본)과 전 연령 같은 기준(AGE_COMMON) 두 가지로 계산
+  const myBand=ageOf(ST.me.pid),band=myBand||AGE_DEFAULT,today=todayStr(),C=cardData(ST.me.pid,today,band),CC=cardData(ST.me.pid,today,AGE_COMMON);
   if(!C)return `<div class="card"><h2>${esc(ST.me.name)} 님 선수 카드</h2><p class="hint">최근 ${CARD_DAYS}일(어제까지) 안에 분석된 내 경기가 없어요. 오늘 경기는 내일부터 카드에 반영돼요.</p></div>`;
-  const {ver,AXS,sc,sub,g,W,ovr}=C,tier=TIER.find(t=>(ovr||0)>=t[0]),P=cardData(ST.me.pid,addDays(today,-7));
+  const {ver,AXS,sc,sub,g,W,ovr}=C,tier=TIER.find(t=>(ovr||0)>=t[0]),P=cardData(ST.me.pid,addDays(today,-7),band);
   const dv=P&&nz(P.ovr)&&nz(ovr)?ovr-P.ovr:null;
   // 최근 1개월 출전이 3쿼터 미만이면 참고용
   const few=C.n<3;
@@ -687,14 +729,15 @@ function cardHtml(){
       <div class="fc-av">${esc((ST.me.name||'?').slice(-2))}</div></div>
       <div class="fc-name">${esc(ST.me.name)}</div>
       <div class="fc-stats">${st}</div>
-      <div class="fc-foot">${md(C.from)}~${md(C.to)} · ${C.games}경기 ${C.n}쿼터</div>
+      <div class="fc-foot">${md(C.from)}~${md(C.to)} · ${C.games}경기 ${C.n}쿼터 · ${band}대${band===70?' 이상':''} 기준</div>
     </div>
     <p style="text-align:center;margin:.1rem 0 .3rem;font-weight:800;font-size:.9rem">${dtxt}</p>
+    <p class="hint" style="text-align:center;margin:0 0 .4rem">${band}대${band===70?' 이상':''} 기준 점수예요${CC&&nz(CC.ovr)&&band!==AGE_COMMON?` · 전 연령 같은 기준(${AGE_COMMON}대)이면 <b>${CC.ovr}점</b>`:''}${myBand?'':'<br>나이를 입력하면 내 나이대 기준으로 매겨요(지금은 40대 기준).'}</p>
     ${gb}
     ${detail}
     ${ver===1?'<p class="hint" style="text-align:center">공 추적이 되면 슛·패스·드리블·수비 능력치로 바뀌어요.</p>':''}
     <details class="axh"><summary>자세히 보기 (능력치 그래프·점수 매기는 법)</summary>${radarSvg(AXS,sc)}
-    <p class="hint">최근 ${CARD_DAYS}일(어제까지) 내 기록을 조기축구 기준표로 30~99점에 맞춰 매겨요. 다른 회원 기록과는 상관없어요. 오늘 경기는 내일부터 반영돼요.</p>
+    <p class="hint">최근 ${CARD_DAYS}일(어제까지) 내 기록을 내 나이대 조기축구 기준으로 30~99점에 맞춰 매겨요. 그 나이대의 평범한 회원이 65점쯤이에요. 위치 관련 항목은 나이와 상관없이 같은 기준이에요. 다른 회원 기록과는 상관없고, 오늘 경기는 내일부터 반영돼요.</p>
     <p class="hint">종합 점수는 ${g?`${PGN[g]} 비중(${AXS.filter(ax=>W[ax.k]).map(ax=>ax.n+' '+W[ax.k]).join(' · ')})`:'포지션을 몰라 6개 평균'}으로 매겨요. 75점 이상 금, 65~74 은, 그 아래 동이에요. 변화는 7일 전 기준(그때의 최근 ${CARD_DAYS}일)과 비교해요.</p>
     <p class="hint">${ver===1?'속도: 가속력·최고 속도(참고)·스프린트 빈도 · 피지컬: 운동량·강도·제동 · 활동량: 분당 거리·활동 범위·민첩성 · 고강도: 고속(시속 20km 이상)·전력 질주(시속 25km 이상) 거리·반복 스프린트 · 체력: 쿼터 후반 거리·고속 거리 유지 · 위치: 작전판 자리·수비 라인·박스 진입·동료 간격.':'공 추적 분석으로 잰 6개 능력치예요.'} 포지션은 작전판 자리, 없으면 평균 위치의 앞뒤로 정해요.</p></details></div>`;
 }
@@ -782,14 +825,16 @@ function mineHtml(){
 // 순위 탭
 function rankHtml(){
   const a=curAna();if(!a)return `<div class="card"><h2>축구회 순위</h2><p class="hint">아직 분석된 경기가 없어요.</p></div>`;
-  const R=allRows();let rows=[],title='',unit='';
+  // 나이대별 보기면 내 나이대(나이 없으면 40대) 회원끼리만
+  const myB=ageOf(ST.me.pid)||AGE_DEFAULT,inB=pid=>!ST.rankAge||(ageOf(pid)||AGE_DEFAULT)===myB;
+  const R=allRows().filter(r=>inB(r.pid));let rows=[],title='',unit='';
   if(ST.rank==='q'){rows=R.filter(r=>r.a.id===a.id).map(r=>({pid:r.pid,v:r.s.distM||0}));title=`${dLabel(a.date)} ${a.q}쿼터 뛴 거리`}
   else if(ST.rank==='d'){const m={};R.filter(r=>r.a.date===a.date).forEach(r=>{m[r.pid]=(m[r.pid]||0)+(r.s.distM||0)});rows=Object.entries(m).map(([pid,v])=>({pid,v}));title=`${dLabel(a.date)} 하루 뛴 거리`}
   else{const m={};R.forEach(r=>{m[r.pid]=Math.max(m[r.pid]||0,r.s.vmaxKmh||0)});rows=Object.entries(m).map(([pid,v])=>({pid,v})).filter(r=>r.v>0);title='최고 속도 (전체 기간) · 참고 값';unit='km/h'}
   rows.sort((x,y)=>y.v-x.v);
   const fmt=v=>unit?v.toFixed(1)+' '+unit:km(v);
-  return `<div class="card"><h2>축구회 순위</h2><div class="seg">${[['q','이 쿼터 거리'],['d','그날 거리'],['v','최고 속도']].map(([k,l])=>`<button data-rank="${k}" class="${ST.rank===k?'on':''}">${l}</button>`).join('')}</div>
-  <p class="hint" style="margin:0 0 .4rem">${esc(title)} · 날짜와 쿼터는 경기 탭에서 고른 것 기준</p>
+  return `<div class="card"><h2>축구회 순위</h2><div class="seg"><button data-rage="0" class="${ST.rankAge?'':'on'}">전체</button><button data-rage="1" class="${ST.rankAge?'on':''}">${myB}대${myB===70?' 이상':''}끼리</button></div><div class="seg">${[['q','이 쿼터 거리'],['d','그날 거리'],['v','최고 속도']].map(([k,l])=>`<button data-rank="${k}" class="${ST.rank===k?'on':''}">${l}</button>`).join('')}</div>
+  <p class="hint" style="margin:0 0 .4rem">${esc(title)}${ST.rankAge?` · ${myB}대끼리`:' · 전체 회원'} · 실제 기록 값 · 날짜와 쿼터는 경기 탭에서 고른 것 기준</p>
   <table><tr><th>순위</th><th>이름</th><th>${unit?'최고 속도':'거리'}</th></tr>${rows.map((r,i)=>`<tr class="${r.pid===ST.me.pid?'me':''}"><td>${i+1}</td><td style="text-align:left">${esc(nameOf(r.pid))}</td><td>${fmt(r.v)}</td></tr>`).join('')||'<tr><td colspan="3" class="hint">아직 이름이 맞춰진 선수가 없어요.</td></tr>'}</table>
   <p class="hint">나 찾기를 한 사람과 운영진이 이름을 맞춘 사람만 나와요.</p></div>
   <div class="card"><h2>나와 회원 평균 비교</h2>${cmpHtml(ST.rank==='q'?scopeRows('q',a.id):scopeRows('d',a.date),ST.me.pid,pitchOf(a),ST.rank==='q'?`${dLabel(a.date)} ${a.q}쿼터`:`${dLabel(a.date)} 하루`)||'<p class="hint">이 경기에서 내 기록이 없거나 비교할 회원이 없어요.</p>'}</div>`;
@@ -802,6 +847,40 @@ function camHtml(){
   return `<p><span class="pill ${c.rec?'on':'off'}">${c.rec?'● 녹화 중':'정지'}</span> ${c.rec&&c.sinceMs?hm(c.sinceMs)+'부터':''} <span class="hint">${age==null?'':stale?`⚠ ${Math.round(age/60)}분째 소식 없음`:`${age}초 전 소식`}</span></p>
   <div class="kpi"><div><b>${c.seg??'-'}</b><span>1분 파일 번호</span></div><div><b class="${c.battery!=null&&c.battery<=20?'bad':''}">${c.battery??'-'}%</b><span>배터리</span></div><div><b class="${c.tempC!=null&&c.tempC>=42?'bad':''}">${c.tempC!=null?Math.round(c.tempC)+'°':'-'}</b><span>온도</span></div>
   <div><b class="${c.freeMin!=null&&c.freeMin<30?'bad':''}">${c.freeMin!=null?Math.round(c.freeMin)+'분':'-'}</b><span>남은 녹화</span></div><div><b>${c.upDone??0}/${c.upTotal??0}</b><span>드라이브 업로드</span></div><div><b>${c.viewStream?'켜짐':'꺼짐'}</b><span>시청용 1080p</span></div></div>`;
+}
+// ---------- 기준 다시 맞추기(운영진) ----------
+const NORM_NAMES={mpm:'분당 거리 m',vol:'운동량 m/쿼터',cov:'활동 범위 %',agi:'방향 전환 회/쿼터',stm:'스태미나',hhk:'후반 고강도 유지',apo:'박스 진입 회/쿼터',
+  top:'최고 속도 km/h',hsr:'고속 거리 m/쿼터',spr:'전력 질주 거리 m/쿼터',spf:'스프린트 회/쿼터',acc:'가속 회/쿼터',brk:'감속 회/쿼터',rsa:'반복 스프린트 회/쿼터'};
+const median=a=>{if(!a.length)return null;const b=a.slice().sort((x,y)=>x-y),m=Math.floor(b.length/2);return b.length%2?b[m]:(b[m-1]+b[m])/2};
+// 최근 1개월(어제까지) 회원별 기록 → 나이대별 중간값. 3명 미만인 나이대는 인접 나이대와 묶어 매끄럽게
+function proposeNorm(){
+  const today=todayStr(),from=addDays(today,-CARD_DAYS),R=allRows().filter(r=>r.a.date>=from&&r.a.date<today),by={};
+  R.forEach(r=>{(by[r.pid]=by[r.pid]||[]).push(r)});
+  const F={};CARD_AX[1].forEach(ax=>ax.subs.forEach(su=>{const k=su.ab||su.k;if(AGE_NORM[k]&&!F[k])F[k]=su.f}));
+  const S={};AGE_BANDS.forEach(b=>S[b]={});
+  Object.entries(by).forEach(([pid,rs])=>{const L=rs.map(r=>r.s),s=mergeStats(L);s._games=new Set(rs.map(r=>r.a.date)).size;
+    const en=L.map(x=>endur(mergeStats([x]))).filter(nz);s._end=en.length?mean(en):null;
+    const hh=L.map(x=>Array.isArray(x.hsrHalves)&&x.hsrHalves[0]>0?x.hsrHalves[1]/x.hsrHalves[0]:null).filter(nz);s._hh=hh.length?mean(hh):null;
+    const b=ageOf(pid)||AGE_DEFAULT;for(const k in F){const v=F[k](s);if(nz(v))(S[b][k]=S[b][k]||[]).push(v)}});
+  const out={},cnt={};
+  for(const k in AGE_NORM){out[k]={};AGE_BANDS.forEach((b,i)=>{let L=S[b][k]||[];cnt[b]=Math.max(cnt[b]||0,L.length);
+    if(L.length<3)L=[...L,...((S[AGE_BANDS[i-1]]||{})[k]||[]),...((S[AGE_BANDS[i+1]]||{})[k]||[])];
+    const m=median(L);out[k][b]=m==null?normOf(k,b):+m.toFixed(Math.abs(m)>=100?0:Math.abs(m)>=10?1:2)})}
+  return {norm:out,cnt,n:Object.keys(by).length};
+}
+function normAdminHtml(){
+  if(!ST.normOpen)return `<div class="card"><h2>점수 기준 다시 맞추기</h2><p class="hint">최근 1개월 우리 축구회 실제 기록으로 나이대별 "평범한 회원 값"(65점 기준)을 다시 계산해 보여 줘요. 적용은 확인한 뒤에 해요.</p><button data-act="normOpen" style="width:100%">제안값 계산하기</button></div>`;
+  const P=proposeNorm();ST.normProp=P.norm;
+  const head=AGE_BANDS.map(b=>`<th>${b}대${b===70?'+':''}<br><small>${P.cnt[b]||0}명</small></th>`).join('');
+  const rows=Object.keys(AGE_NORM).map(k=>`<tr><td style="text-align:left;font-size:.76rem;min-width:5.5rem">${NORM_NAMES[k]||k}</td>${AGE_BANDS.map(b=>{const c=normOf(k,b),p=P.norm[k][b],ch=Math.abs(p-c)>Math.abs(c)*0.05;return `<td style="font-size:.78rem">${c}${ch?`<br><b class="${p>c?'up':'dn'}">→${p}</b>`:''}</td>`}).join('')}</tr>`).join('');
+  return `<div class="card"><h2>점수 기준 다시 맞추기</h2><p class="hint" style="margin:0 0 .4rem">최근 1개월 회원 ${P.n}명 기록 기준 · 위는 지금 기준, 아래 → 는 제안값(5% 넘게 다를 때만). 3명 미만인 나이대는 옆 나이대와 묶어 계산했어요.</p>
+    <div style="overflow-x:auto"><table class="nt"><tr><th>항목</th>${head}</tr>${rows}</table></div>
+    <div class="row" style="margin-top:.6rem"><button class="pri" data-act="normApply">제안값 적용</button><button data-act="normReset">처음 기준으로</button><button data-act="normClose">닫기</button></div>
+    <p class="hint">적용하면 모든 회원 카드가 이 기준으로 바뀌어요. 구글 로그인한 운영진만 적용할 수 있어요.${ST.norm?' 지금은 운영진이 적용한 기준을 쓰고 있어요.':''}</p></div>`;
+}
+async function saveNorm(norm){
+  if(!ST.user||!ST.admin){say('구글 로그인한 운영진만 적용할 수 있어요.','bad');return}
+  try{const F=ST.F;await F.setDoc(F.doc(ST.db,'pub',ST.conf.code,'conf','norm'),{norm,upd:Date.now(),by:ST.user.email});say(norm?'새 기준을 적용했어요.':'처음 기준으로 되돌렸어요.','ok')}catch(e){say('저장하지 못했어요.','bad')}
 }
 // 이름 고치기 목록: 그날 출석한 사람을 먼저(이름 앞 ●)
 function namesForFix(a){loadAtt(a.date);const S=ST.attSet[a.date],N=(ST.P.names||[]).slice();if(!S||!S.size)return N;return [...N.filter(n=>S.has(n.id)).map(n=>Object.assign({},n,{name:'● '+n.name})),...N.filter(n=>!S.has(n.id))]}
@@ -818,6 +897,7 @@ function adminHtml(){
     <ul class="list">${(a.tracks||[]).map(t=>{const o=ownerOf(a,t.tid),s=a.stats&&a.stats[t.tid];return `<li><span style="flex:0 0 5.5rem">${t.team?t.team+'팀 ':''}#${esc(t.tid)}<br><small class="hint">${s?km(s.distM):''}${t.by?' · '+({board:'작전판',claim:'본인',admin:'운영진'}[t.by]||t.by):(!t.pid&&o?' · 본인':'')}</small></span><select data-pid="${esc(t.tid)}"><option value="">(모름)</option>${namesForFix(a).map(n=>`<option value="${esc(n.id)}" ${n.id===o?'selected':''}>${esc(n.name)}</option>`).join('')}</select></li>`}).join('')}</ul>
     <button class="pri" data-act="savePid" style="width:100%;margin-top:.4rem">이름 저장</button></div>`:''}
   <div class="card"><h2>촬영 폰 연결</h2><p class="hint" style="margin:0">촬영 앱에서 <b>서버 연결 → QR 읽기</b>로 아래를 찍어 주세요.</p><div class="qr" id="camQr"></div><p class="hint" style="text-align:center;word-break:break-all">코드: <b>${esc(code)}</b></p></div>
+  ${normAdminHtml()}
   <div class="card"><h2>운영진</h2>${ST.user?`<p>${esc(ST.user.email)} ${ST.admin?'<span class="pill on">운영진</span>':'<span class="pill off">목록에 없음</span>'}</p>`:'<p class="hint">이 휴대폰은 기존 연결 링크로 관리 권한이 있어요.</p>'}
     <div class="row"><button data-act="oldAdmin">로테이션·작전판 관리 화면</button>${ST.user?'<button data-act="logout">로그아웃</button>':'<button data-act="login">구글 로그인</button>'}</div></div>`;
 }
@@ -887,6 +967,7 @@ document.addEventListener('click',e=>{
   const fm=t.closest('[data-fteam]');if(fm){const a=curAna();if(a){ST.fteam[a.id]=fm.dataset.fteam||null;ST.more[a.id]=false;render()}return}
   const ax=t.closest('[data-ax]');if(ax){ST.cardOpen=ST.cardOpen===ax.dataset.ax?null:ax.dataset.ax;render();return}
   const gvb=t.closest('[data-gview]');if(gvb){ST.gview=gvb.dataset.gview;render();return}
+  const ra=t.closest('[data-rage]');if(ra){ST.rankAge=ra.dataset.rage==='1';render();return}
   const rk=t.closest('[data-rank]');if(rk){ST.rank=rk.dataset.rank;render();return}
   const cm=t.closest('[data-cmd]');if(cm){camCmd(cm.dataset.cmd);return}
   const ac=t.closest('[data-act]');if(!ac)return;e.preventDefault();
@@ -897,6 +978,8 @@ document.addEventListener('click',e=>{
     else if(k==='more'){ST.more[a.id]=true;render()}else saveMine(a,ac.dataset.t)}
   else if(k==='goFind'){ST.tab='game';ST.sel=ac.dataset.t;ST.gview='q';render();const c=document.getElementById('findCard');if(c)c.scrollIntoView({block:'start'})}
   else if(k==='banOff'){let off=[];try{off=JSON.parse(localStorage.getItem('bz-banoff')||'[]')}catch(e){}off=[...off,ac.dataset.t].slice(-60);try{localStorage.setItem('bz-banoff',JSON.stringify(off))}catch(e){}render()}
+  else if(k==='normOpen'){ST.normOpen=true;render()}else if(k==='normClose'){ST.normOpen=false;render()}
+  else if(k==='normApply'){if(ST.normProp)saveNorm(ST.normProp)}else if(k==='normReset')saveNorm(null);
   else if(k==='login')login();else if(k==='logout'){ST.A&&ST.A.signOut(ST.auth)}
   else if(k==='oldAdmin'){try{sessionStorage.setItem('bz-admin','1')}catch(err){}location.href='index.html'}
   else if(k==='mark')addMark();else if(k==='saveYt')saveYt();else if(k==='savePid')savePid();
@@ -928,6 +1011,8 @@ async function start(){
       const old=new Set(ST.ana.map(a=>a.id));ST.ana=qs.docs.map(d=>Object.assign({id:d.id},d.data()));
       ST.ana.forEach(a=>{if(!old.has(a.id)||!ST.claims[a.id])loadClaims(a.id)});render()},()=>{});
     F.onSnapshot(F.doc(ST.db,'pub',code,'cam','state'),s=>{ST.cam=s.exists()?s.data():null;if(ST.tab==='admin')render()},()=>{});
+    // 운영진이 적용한 나이대별 점수 기준(없으면 코드의 AGE_NORM)
+    F.onSnapshot(F.doc(ST.db,'pub',code,'conf','norm'),s=>{ST.norm=(s.exists()&&s.data().norm)||null;render()},()=>{});
     F.onSnapshot(F.doc(ST.db,'pub',code,'cam','marks'),s=>{ST.marks=(s.exists()&&s.data().list)||[];if(ST.tab==='admin')render()},()=>{});
     setInterval(()=>{if(ST.tab==='admin')render()},30000);
   }catch(e){ST.err='연결하지 못했어요. 인터넷 연결을 확인해 주세요.';render()}
