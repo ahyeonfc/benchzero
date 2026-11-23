@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0f3d2a">
-<title>벤치제로 출석</title>
+<title>골고 출석</title>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
@@ -40,7 +40,7 @@ ol li span.t{margin-left:auto;color:var(--mute);font-size:.9rem}
 </style>
 </head>
 <body>
-<header><h1 id="title">벤치제로 출석</h1><p id="today"></p></header>
+<header><h1 id="title">골고 출석</h1><p id="today"></p><p><a href="member.html" style="color:inherit;font-weight:700">내 경기 분석 보기 →</a></p></header>
 <main>
 <div id="app"><p class="ld">불러오는 중…</p></div>
 <div class="card" id="listCard" hidden>
@@ -89,7 +89,8 @@ function render(){
   $('today').textContent=new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'});
   if(!ST.conf){app.innerHTML='<div class="card"><h2>링크가 필요해요</h2><p>운영자가 보낸 <b>출석 링크</b>나 운동장의 <b>QR코드</b>로 들어와 주세요.</p></div>';return}
   if(!P){app.innerHTML='<p class="ld">'+(ST.err?esc(ST.err):'불러오는 중…')+'</p>';return}
-  if(P.title)$('title').textContent=P.title+' 출석';
+  // 서비스 이름을 골고로 바꿈(2026-11-23). 예전에 저장된 제목 "벤치제로"는 골고로 보여 준다
+  if(P.title)$('title').textContent=(P.title==='벤치제로'?'골고':P.title)+' 출석';
   $('listCard').hidden=false;
   const m=`<p class="msg ${ST.mcls}">${esc(ST.msg)}</p>`;
   if(!ST.me){

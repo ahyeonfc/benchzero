@@ -11,12 +11,12 @@
 }catch(e){}})();
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>벤치제로</title>
+<title>골고</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0f3d24">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="벤치제로">
+<meta name="apple-mobile-web-app-title" content="골고">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1291,7 +1291,7 @@ function ciTick(){
     CI.unBind=F.onSnapshot(F.collection(db,'pub',c.code,'bind'),qs=>{CI.binds=qs.docs.map(d=>Object.assign({id:d.id},d.data()));renderCi();renderRoster()},()=>{});
   }
   if(S.ciDone.date===today()){const gone=S.ciDone.ids.filter(id=>{const p=S.players.find(x=>x.id===id.slice(id.lastIndexOf('_')+1));return p&&!p.here&&!p.left});if(gone.length){S.ciDone.ids=S.ciDone.ids.filter(id=>!gone.includes(id));S.ciDone.del=[...(S.ciDone.del||[]).filter(x=>x&&x.id),...gone.map(id=>({id,t:Date.now()}))];gone.forEach(id=>F.deleteDoc(F.doc(db,'pub',c.code,'in',id)).catch(()=>{}));save()}}
-  const pub={title:'벤치제로',on:!!c.on,radius:+c.radius||300,sched:{home:S.sched.home,weekly:S.sched.weekly,games:S.sched.games.filter(g=>g.date>=today())},events:evList().map(e=>({id:e.id,date:e.date,from:e.from,to:e.to,loc:e.place,opp:e.opp,mode:e.mode})),names:S.players.map(p=>({id:p.id,name:p.name,age:p.age||null}))};
+  const pub={title:'골고',on:!!c.on,radius:+c.radius||300,sched:{home:S.sched.home,weekly:S.sched.weekly,games:S.sched.games.filter(g=>g.date>=today())},events:evList().map(e=>({id:e.id,date:e.date,from:e.from,to:e.to,loc:e.place,opp:e.opp,mode:e.mode})),names:S.players.map(p=>({id:p.id,name:p.name,age:p.age||null}))};
   const k=JSON.stringify(pub);
   if(k!==CI.lastPub){clearTimeout(CI.pubT);CI.pubT=setTimeout(()=>{F.setDoc(F.doc(db,'pub',c.code),Object.assign(pub,{upd:Date.now()})).then(()=>{CI.lastPub=k}).catch(()=>{})},800)}
   renderCi();
