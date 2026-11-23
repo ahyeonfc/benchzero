@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>시험 데이터 넣기</title>
+<style>body{font-family:system-ui,sans-serif;max-width:560px;margin:1rem auto;padding:0 1rem;line-height:1.6}button{font:inherit;padding:.6rem 1rem;border-radius:.6rem}pre{background:#eee;padding:.6rem;white-space:pre-wrap;font-size:.85rem}</style></head>
+<body>
+<h1>시험 데이터 넣기</h1>
+<p>시험용 코드 <b>matchcamtest0000000001</b> 아래에만 표본 명단·분석 문서 3개(쿼터 1~3)·촬영 폰 상태를 씁니다. 실제 축구회 데이터는 건드리지 않습니다.</p>
+<button id="go">시험 데이터 넣기</button> <button id="chk">읽기·쓰기 규칙 확인</button>
+<p><a href="../member.html#matchcamtest0000000001">회원 화면(시험 코드)으로 가기</a></p>
+<pre id="log"></pre>
+<script type="module">
+// 개발용 도구: 회원 화면 미리보기에 쓸 표본 데이터를 만든다(Firestore 데이터 약속 v1 형식)
+const FBV='13.4.0',CODE='matchcamtest0000000001';
+const CFG={"apiKey":"AIzaSyDvJZfjmVWOMXzNAgYciQC80qDx8n3iP6E","authDomain":"benchzero-50f14.firebaseapp.com","projectId":"benchzero-50f14","storageBucket":"benchzero-50f14.firebasestorage.app","messagingSenderId":"279178405228","appId":"1:279178405228:web:11cefb680a5a1c85837f49"};
+const log=t=>{document.getElementById('log').textContent+=t+'\n'};
+const A=await import(`https://www.gstatic.com/firebasejs/${FBV}/firebase-app.js`);
+const F=await import(`https://www.gstatic.com/firebasejs/${FBV}/firebase-firestore.js`);
+const db=F.getFirestore(A.initializeApp(CFG,'seed'));
+const NAMES=['김철수','이영호','박민수','최준혁','정대현','강성민','조현우','윤재석','장동건','임태훈','한상우','오지훈','서민재','신동욱'].map((n,i)=>({id:'p'+(i+1),name:n,age:[30,40,40,50,30,40,50,30,40,60,40,30,50,40][i]}));
+let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+function frame(players){
+  // 고정 카메라 화면 흉내: 운동장 사다리꼴 위에 선수 점
+  const c=document.createElement('canvas');c.width=1280;c.height=720;const g=c.getContext('2d');
+  g.fillStyle='#6b7f8f';g.fillRect(0,0,1280,720);g.fillStyle='#3d8a4f';g.beginPath();g.moveTo(240,170);g.lineTo(1040,170);g.lineTo(1270,690);g.lineTo(10,690);g.closePath();g.fill();
+  g.strokeStyle='#fff';g.lineWidth=3;g.stroke();g.beginPath();g.moveTo(640,170);g.lineTo(640,690);g.stroke();
+  players.forEach(p=>{const[x,y,w,h]=p.box;g.fillStyle=p.team==='A'?'#1d4ed8':'#dc2626';g.fillRect((x+w*.2)*1280,(y+h*.1)*720,w*.6*1280,h*.55*720);g.fillStyle='#222';g.fillRect((x+w*.25)*1280,(y+h*.65)*720,w*.5*1280,h*.35*720);g.fillStyle='#f2c9a0';g.beginPath();g.arc((x+w/2)*1280,(y+h*.08)*720,w*.22*1280,0,7);g.fill()});
+  return c.toDataURL('image/jpeg',.7).split(',')[1];
+}
+function quarter(date,q,startMs){
+  const tracks=[],stats={};
+  for(let i=0;i<14;i++){
+    const team=i<7?'A':'B',fx=team==='A'?0.15+rnd()*0.35:0.5+rnd()*0.35,fy=0.3+rnd()*0.6;
+    // 화면 좌표(원근: 위로 갈수록 작게)
+    const sc=0.5+fy*0.7,w=0.022*sc,h=0.09*sc,cx=0.5+(fx-0.5)*(0.62+0.38*fy);
+    const tid=String(q*100+i+1);
+    // 쿼터 1은 일부만 작전판 자동 매칭, 나머지는 나 찾기로
+    const pid=q===1&&i<4?'p'+(i+1):q===2&&i<2?'p'+(i+1):null;
+    tracks.push({tid,team,box:[+(cx-w/2).toFixed(4),+(0.17+fy*0.72-h).toFixed(4),+w.toFixed(4),+h.toFixed(4)],pid,by:pid?'board':null});
+    const mins=20+rnd()*5,dist=1800+rnd()*1400,z={walk:dist*.3,jog:dist*.4,run:dist*.2,sprint:dist*.1*(0.5+rnd())};
+    const ax=fx*100,ay=fy*64,heat=[];for(let r=0;r<8;r++)for(let k=0;k<12;k++){const dx=(k+.5)/12*100-ax,dy=(r+.5)/8*64-ay;heat.push(+Math.exp(-(dx*dx/500+dy*dy/250)).toFixed(3))}
+    const board=[ax+(rnd()-.5)*16,ay+(rnd()-.5)*12];
+    stats[tid]={mins:+mins.toFixed(1),distM:Math.round(dist),zones:Object.fromEntries(Object.entries(z).map(([k,v])=>[k,Math.round(v)])),sprints:Math.round(3+rnd()*12),hiRatio:+((z.run+z.sprint)/dist).toFixed(3),vmaxKmh:+(22+rnd()*9).toFixed(1),heat,avg:[+ax.toFixed(1),+ay.toFixed(1)],board:[+board[0].toFixed(1),+board[1].toFixed(1)],devM:+Math.hypot(board[0]-ax,board[1]-ay).toFixed(1),coverPct:+(15+rnd()*25).toFixed(1)};
+  }
+  return {v:1,date,q,startMs,endMs:startMs+25*6e4,source:'benchzero',video:{yt:q===1?'https://youtu.be/aqz-KE-bpKQ':null,drive:q===2?'https://drive.google.com/':null,offsetSec:0},
+    frame:{w:1280,h:720,jpg:frame(tracks)},tracks,stats,
+    team:{A:{lineYm:28.4+q,widthM:41.2,lengthM:33.5,distM:22400},B:{lineYm:31.0-q,widthM:38.7,lengthM:30.1,distM:21800}},
+    pitch:{w:100,h:64,calibrated:true},updatedMs:Date.now()};
+}
+document.getElementById('go').onclick=async()=>{
+  try{
+    await F.setDoc(F.doc(db,'pub',CODE),{title:'벤치제로',on:false,names:NAMES,upd:Date.now()});log('명단 저장');
+    // 지난주 경기(비교·부하 관리용)와 이번 경기
+    const days=[['2026-11-01',Date.parse('2026-11-01T07:00:00+09:00')],['2026-11-08',Date.parse('2026-11-08T07:00:00+09:00')],['2026-11-15',Date.parse('2026-11-15T07:00:00+09:00')],['2026-11-22',Date.parse('2026-11-22T07:00:00+09:00')]];
+    for(const [d,t0] of days){const n=d==='2026-11-22'?3:2;for(let q=1;q<=n;q++){const a=quarter(d,q,t0+(q-1)*30*6e4);
+      // 지난 경기에서는 p5(정대현)도 이미 나 찾기를 마친 것으로
+      if(d!=='2026-11-22'){a.tracks[4].pid='p5';a.tracks[4].by='claim';a.tracks[8].pid='p9';a.tracks[8].by='admin'}
+      await F.setDoc(F.doc(db,'pub',CODE,'ana',`${d}_${q}`),a);log(`분석 ${d}_${q} 저장 (첫 장면 ${Math.round(a.frame.jpg.length*3/4/1024)}KB)`)}}
+    await F.setDoc(F.doc(db,'pub',CODE,'cam','state'),{rec:true,sinceMs:Date.now()-42*6e4,seg:43,battery:71,tempC:38.5,freeMin:150,upDone:41,upTotal:42,viewStream:true,ts:Date.now()});log('촬영 폰 상태 저장');
+    log('끝. 회원 화면에서 정대현(p5)을 골라 보세요.');
+  }catch(e){log('오류: '+(e.code||e.message))}
+};
+document.getElementById('chk').onclick=async()=>{
+  const t=async(n,f)=>{try{await f();log('✓ '+n)}catch(e){log('✗ '+n+' '+(e.code||e.message))}};
+  await t('ana 읽기',()=>F.getDocs(F.collection(db,'pub',CODE,'ana')));
+  await t('ana 쓰기(updatedMs)',()=>F.setDoc(F.doc(db,'pub',CODE,'ana','rulecheck_0'),{v:1,date:'rulecheck',q:0,startMs:0,updatedMs:Date.now()}));
+  const tid='t'+Date.now();
+  await t('claim 생성',()=>F.setDoc(F.doc(db,'pub',CODE,'ana','rulecheck_0','claim',tid),{pid:'p1',ts:Date.now()}));
+  await t('claim 덮어쓰기는 막혀야 함(✗가 정상)',()=>F.setDoc(F.doc(db,'pub',CODE,'ana','rulecheck_0','claim',tid),{pid:'p2',ts:Date.now()}));
+  await t('cam/state 쓰기',()=>F.setDoc(F.doc(db,'pub',CODE,'cam','state'),{rec:false,ts:Date.now()},{merge:true}));
+  await t('cam/cmd 읽기',()=>F.getDoc(F.doc(db,'pub',CODE,'cam','cmd')));
+  await t('짧은 코드는 막혀야 함(✗가 정상)',()=>F.getDoc(F.doc(db,'pub','short','cam','state')));
+  await t('admins 읽기는 로그인 없이 막혀야 함(✗가 정상)',()=>F.getDoc(F.doc(db,'admins','x@example.com')));
+  await t('rulecheck 문서 지우기',()=>F.deleteDoc(F.doc(db,'pub',CODE,'ana','rulecheck_0')));
+};
+</script>
+</body></html>
