@@ -1504,7 +1504,8 @@ function kickoff(){
   {const pi=liveQ();if(pi>=0&&pi!==S.cur&&!S.q[pi].ended){S.q[pi].ended=Date.now();camEvt('quarterEnd',pi+1,S.q[pi].ended)}}
   q.started=Date.now();q.ended=null;const n=S.cur+1;
   // 출전 명단(lineup): 회원 화면 나 찾기 후보 좁히기용(분석기가 ana.lineup 으로 옮김)
-  camEvt('quarterStart',n,q.started,{lineup:[...(q.slots||[]),...(q.b||[])].filter(Boolean)});
+  // onField: 그 쿼터 운동장 위 인원(두 팀 합). 분석기가 영상 속 사람 번호를 이 수에 맞춘다(2026-11-24)
+  camEvt('quarterStart',n,q.started,{lineup:[...(q.slots||[]),...(q.b||[])].filter(Boolean),onField:qsz(q)*2});
   if(S.cur===S.nq-1)S.nq=Math.min(20,S.nq+1);
   if(S.cur<S.nq-1){S.cur++;sel=null;norm();if(!filled(S.q[S.cur]))autoAll()}
   render();

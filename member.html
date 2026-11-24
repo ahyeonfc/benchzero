@@ -888,7 +888,7 @@ function camHtml(){
   return `<p><span class="pill ${c.rec?'on':'off'}">${c.rec?'● 녹화 중':'정지'}</span> ${c.rec&&c.sinceMs?hm(c.sinceMs)+'부터':''} <span class="hint">${age==null?'':stale?`⚠ ${Math.round(age/60)}분째 소식 없음`:`${age}초 전 소식`}</span></p>
   <div class="kpi"><div><b>${c.seg??'-'}</b><span>1분 파일 번호</span></div><div><b class="${c.battery!=null&&c.battery<=20?'bad':''}">${c.battery??'-'}%</b><span>배터리</span></div><div><b class="${c.tempC!=null&&c.tempC>=42?'bad':''}">${c.tempC!=null?Math.round(c.tempC)+'°':'-'}</b><span>온도</span></div>
   <div><b class="${c.freeMin!=null&&c.freeMin<30?'bad':''}">${c.freeMin!=null?Math.round(c.freeMin)+'분':'-'}</b><span>남은 녹화</span></div><div><b>${c.upDone??0}/${c.upTotal??0}</b><span>드라이브 업로드</span></div><div><b>${c.quarterFiles??'-'}</b><span>폰의 쿼터 영상</span></div></div>
-  ${camHeatHtml(c)}${anaRunHtml()}${camSetHtml(c)}`;
+  ${camHeatHtml(c)}${anaRunHtml()}${camSetHtml(c)}${pitchSetHtml()}`;
 }
 // 촬영 설정 원격 조종(2026-11-23): 앱 0.6.4 부터 cam/state 에 upMode·lens·pos 가 오고, cam/cmd {op, v} 를 받는다
 const CAM_UP=[['OFF','꺼짐'],['WIFI_ONLY','와이파이만'],['WITH_MOBILE','모바일 데이터 포함']];
@@ -928,6 +928,42 @@ async function anaStop(){
   await ST.sdkP;
   const F=ST.F;
   try{await F.setDoc(F.doc(ST.db,'pub',ST.conf.code,'cam','anaCmd'),{op:'stop',ts:Date.now(),who:(ST.anaRun&&ST.anaRun.who)||null});say('분석기 끄기를 보냈어요. 지금 파일을 마치고 1분 안에 멈춰요.','ok')}catch(e){say('보내지 못했어요.','bad')}
+}
+// ---------- 운동장 네 점(2026-11-24) ----------
+// 분석기가 경기 폴더 첫 장면을 cam/frame {jpg, w, h, position} 으로 보내고, 운영진이 그 위에서 네 점을 누르면
+// cam/pitch {위치: {pts:[x1,y1..x4,y4](화면 비율), m:[..](운동장 m), w, h, ts}} 에 저장한다. 분석기는 다음 1분 파일부터 거리·속도를 계산한다.
+// 배열 안 배열은 Firestore 가 막아서 평평한 배열로 둔다. x = 길이 방향(왼쪽 골라인 0), y = 폭 방향(카메라 쪽 터치라인 0)
+const PITCH_MARKS=[['nl','가까운 왼쪽 코너',(w,h)=>[0,0]],['nh','가까운 쪽 하프라인 끝',(w,h)=>[w/2,0]],['nr','가까운 오른쪽 코너',(w,h)=>[w,0]],
+  ['fl','먼 왼쪽 코너',(w,h)=>[0,h]],['fh','먼 쪽 하프라인 끝',(w,h)=>[w/2,h]],['fr','먼 오른쪽 코너',(w,h)=>[w,h]],['cc','센터 서클 가운데',(w,h)=>[w/2,h/2]]];
+const POS_NAME={halfline:'하프라인',corner:'코너',other:'기타'};
+function pitchSetHtml(){
+  const f=ST.camFrame,pos=(f&&f.position)||'halfline',saved=(ST.camPitch||{})[pos];
+  const head=`<h3 style="margin:1rem 0 .3rem">운동장 네 점 <span class="hint">${esc(POS_NAME[pos]||pos)} 촬영</span></h3>`;
+  if(!f||!f.jpg)return head+`<p class="hint">분석기가 켜지고 첫 1분 파일을 받으면 여기 촬영 화면이 나와요. 그 위에서 운동장 네 점을 눌러 주세요. 네 점이 있어야 뛴 거리·속도가 계산돼요.</p>`;
+  const pk=ST.pk;
+  if(!pk)return head+`<p class="${saved?'':'bad'}" style="margin:.2rem 0">${saved?`저장됨: 길이 ${saved.w}m × 폭 ${saved.h}m (${new Date(saved.ts).toLocaleDateString()})`:'아직 없어요. 거리·속도가 빈칸으로 나와요.'}</p>
+    <div style="position:relative">${pitchImg(f,saved?saved.pts:null)}</div><div class="row" style="margin-top:.5rem"><button class="pri" data-act="pkStart">${saved?'네 점 다시 찍기':'네 점 찍기'}</button></div>`;
+  const i=pk.pts.length/2,done=i>=4;
+  return head+`<p style="margin:.2rem 0"><b>${done?'네 점을 다 찍었어요. 운동장 크기를 확인하고 저장하세요.':`${i+1}번째 점: ${esc(PITCH_MARKS.find(m=>m[0]===pk.marks[i])[1])}`}</b></p>
+    ${done?'':`<div class="row">${PITCH_MARKS.map(m=>`<button data-pkmark="${m[0]}" class="${pk.marks[i]===m[0]?'on':''}" ${pk.marks.slice(0,i).includes(m[0])?'disabled':''}>${esc(m[1])}</button>`).join('')}</div><p class="hint" style="margin:.2rem 0">화면에 안 보이는 점은 다른 점(하프라인 끝, 센터 서클 가운데)으로 바꿔 고르세요. 한 줄에 세 점이 놓이지 않게 고르세요.</p>`}
+    <div style="position:relative">${pitchImg(f,pk.pts,!done)}</div>
+    <div class="row" style="margin-top:.5rem"><label>길이 <input id="pkW" type="number" inputmode="numeric" value="${pk.w}" style="width:4.5rem">m</label><label>폭 <input id="pkH" type="number" inputmode="numeric" value="${pk.h}" style="width:4.5rem">m</label></div>
+    <div class="row" style="margin-top:.5rem"><button data-act="pkUndo" ${pk.pts.length?'':'disabled'}>한 점 지우기</button><button data-act="pkCancel">취소</button><button class="pri" data-act="pkSave" ${done?'':'disabled'}>저장</button></div>`;
+}
+function pitchImg(f,pts,clickable){
+  const dots=[];for(let i=0;pts&&i<pts.length/2;i++)dots.push(`<span style="position:absolute;left:${pts[i*2]*100}%;top:${pts[i*2+1]*100}%;transform:translate(-50%,-50%);width:1.4rem;height:1.4rem;border-radius:50%;background:#e53935;color:#fff;font-size:.8rem;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #fff">${i+1}</span>`);
+  return `<img id="${clickable?'pkImg':''}" src="data:image/jpeg;base64,${f.jpg}" alt="촬영 화면" style="width:100%;display:block;border-radius:.5rem;${clickable?'cursor:crosshair':''}">${dots.join('')}`;
+}
+function pkStart(){const f=ST.camFrame,pos=(f&&f.position)||'halfline',s=(ST.camPitch||{})[pos];
+  // 하프라인 옆에서는 가까운 코너가 잘리기 쉬워서 하프라인 끝·먼 코너·센터 서클을 먼저 권한다
+  ST.pk={pts:[],marks:pos==='halfline'?['nh','fl','fr','cc']:['nl','nr','fr','fl'],w:(s&&s.w)||90,h:(s&&s.h)||60};render()}
+async function pkSave(){
+  const pk=ST.pk,f=ST.camFrame,pos=(f&&f.position)||'halfline';
+  const w=parseFloat(($('pkW')||{}).value)||pk.w,h=parseFloat(($('pkH')||{}).value)||pk.h;
+  if(w<20||w>130||h<15||h>100){say('운동장 크기를 확인해 주세요(길이 20~130m, 폭 15~100m).','bad');return}
+  const m=[];pk.marks.forEach(k=>m.push(...PITCH_MARKS.find(x=>x[0]===k)[2](w,h)));
+  await ST.sdkP;const F=ST.F;
+  try{await F.setDoc(F.doc(ST.db,'pub',ST.conf.code,'cam','pitch'),{[pos]:{pts:pk.pts.map(v=>Math.round(v*10000)/10000),m,w,h,ts:Date.now()}},{merge:true});ST.pk=null;say('운동장 네 점을 저장했어요. 분석기가 다음 1분 파일부터 거리·속도를 계산해요.','ok')}catch(e){say('저장하지 못했어요.','bad')}
 }
 // 발열(촬영 앱 0.6.6~): 폰 발열 단계 0~6. 3(심각)이면 업로드를 멈추고, 오래가면 1080p 로 낮춘다
 function camHeatHtml(c){
@@ -1074,11 +1110,18 @@ document.addEventListener('click',e=>{
   const ra=t.closest('[data-rage]');if(ra){ST.rankAge=ra.dataset.rage==='1';render();return}
   const rk=t.closest('[data-rank]');if(rk){ST.rank=rk.dataset.rank;render();return}
   const cm=t.closest('[data-cmd]');if(cm){camCmd(cm.dataset.cmd);return}
+  // 운동장 네 점: 화면을 누른 자리(비율), 점 종류 고르기
+  if(t.id==='pkImg'&&ST.pk&&ST.pk.pts.length<8){const r=t.getBoundingClientRect();ST.pk.pts.push(Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),Math.min(1,Math.max(0,(e.clientY-r.top)/r.height)));render();return}
+  const pm=t.closest('[data-pkmark]');if(pm&&ST.pk&&!pm.disabled){ST.pk.marks[ST.pk.pts.length/2]=pm.dataset.pkmark;render();return}
   const cs=t.closest('[data-camset]');if(cs&&!cs.disabled){const [op,v]=cs.dataset.camset.split(':');camCmd(op,v);return}
   const ac=t.closest('[data-act]');if(!ac)return;e.preventDefault();
   const k=ac.dataset.act;
   if(k==='checkin'){location.href=checkinHref();return}
   if(k==='anaStop'){anaStop();return}
+  if(k==='pkStart'){pkStart();return}
+  if(k==='pkCancel'){ST.pk=null;render();return}
+  if(k==='pkUndo'){if(ST.pk){ST.pk.pts.splice(-2,2);render()}return}
+  if(k==='pkSave'){pkSave();return}
   if(k==='anaRun'){window.open(ANA_RUN_URL,'_blank','noopener');return}
   if(k==='anaColab'){window.open(ANA_COLAB_URL,'_blank','noopener');return}
   if(k==='yes')bind();else if(k==='no'){ST.confirm=null;render()}
@@ -1183,6 +1226,9 @@ async function loadSdk(cfg){
       F.onSnapshot(F.doc(ST.db,'pub',code,'cam','state'),s=>{ST.cam=s.exists()?s.data():null;if(ST.tab==='admin')render()},()=>{});
       // 자동 분석기 상태(Colab 1순위 / Kaggle 2순위, 2026-11-23)
       F.onSnapshot(F.doc(ST.db,'pub',code,'cam','ana'),s=>{ST.anaRun=s.exists()?s.data():null;if(ST.tab==='admin')render()},()=>{});
+      // 운동장 네 점: 분석기가 보낸 첫 장면과 저장된 네 점(2026-11-24). 네 점을 찍는 중에는 화면을 다시 그리지 않는다
+      F.onSnapshot(F.doc(ST.db,'pub',code,'cam','frame'),s=>{ST.camFrame=s.exists()?s.data():null;if(ST.tab==='admin'&&!ST.pk)render()},()=>{});
+      F.onSnapshot(F.doc(ST.db,'pub',code,'cam','pitch'),s=>{ST.camPitch=s.exists()?s.data():null;if(ST.tab==='admin'&&!ST.pk)render()},()=>{});
       F.onSnapshot(F.doc(ST.db,'pub',code,'cam','marks'),s=>{ST.marks=(s.exists()&&s.data().list)||[];if(ST.tab==='admin')render()},()=>{});
       setInterval(()=>{if(ST.tab==='admin')render()},30000)}
     return true;
