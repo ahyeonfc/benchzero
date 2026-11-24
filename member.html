@@ -911,7 +911,16 @@ function anaRunHtml(){
   const age=Math.round((Date.now()-a.hb)/1000),who=a.who==='kaggle'?'Kaggle':'Colab';
   const on=a.state!=='stopped'&&age<180;
   const what=a.state==='starting'?'켜는 중':a.state==='busy'?`분석 중${a.file?' · '+esc(a.file):''}`:a.state==='stopped'?'꺼짐':'대기 중';
-  return `<p class="${on?'':'bad'}" style="margin:.4rem 0 0">🧠 분석기: ${on?`${who} ${what}`:`꺼짐(마지막 ${who}, ${age<3600?Math.round(age/60)+'분':Math.round(age/3600)+'시간'} 전)`}${a.done?` · 오늘 ${a.done}개 분석`:''}${on?'':' · 일요일 오전엔 녹화를 시작하면 Kaggle 이 5~10분 안에 대신 켜져요'}</p>${anaBtnHtml(on)}`;
+  return `<p class="${on?'':'bad'}" style="margin:.4rem 0 0">🧠 분석기: ${on?`${who} ${what}`:`꺼짐(마지막 ${who}, ${age<3600?Math.round(age/60)+'분':Math.round(age/3600)+'시간'} 전)`}${a.done?` · 오늘 ${a.done}개 분석`:''}${on?'':' · 일요일 오전엔 녹화를 시작하면 Kaggle 이 5~10분 안에 대신 켜져요'}</p>${anaBtnHtml(on)}${gpuListHtml()}`;
+}
+// 지금 켜진 GPU(2026-11-24): 운영 분석기(cam/ana) + 시험 노트북들(cam/gpu {이름: {who, kind, name, state, hb, note}})
+// 시험 노트북은 1분마다 cam/gpu 의 자기 칸에 신호를 남긴다. 3분 넘게 신호가 없으면 꺼진 것으로 본다
+function gpuListHtml(){
+  const now=Date.now(),rows=[];
+  const a=ST.anaRun;if(a&&a.hb&&a.state!=='stopped'&&now-a.hb<180000)rows.push({who:a.who,kind:'운영',name:'경기 자동 분석',state:a.state==='busy'?'분석 중':a.state==='starting'?'켜는 중':'대기 중'});
+  Object.values(ST.gpu||{}).forEach(g=>{if(g&&g.hb&&now-g.hb<180000&&g.state!=='stopped')rows.push(g)});
+  const W={colab:'Colab',kaggle:'Kaggle'};
+  return `<p class="hint" style="margin:.5rem 0 .2rem"><b>지금 켜진 GPU</b> ${rows.length?`${rows.length}개`:'없음'} <span class="hint">(무료 GPU 는 Colab·Kaggle 각각 한 번에 하나)</span></p>${rows.map(g=>`<p style="margin:.1rem 0">• ${esc(W[g.who]||g.who||'?')} · ${esc(g.kind||'')} · ${esc(g.name||'')} · ${esc(g.state||'')}${g.note?` <span class="hint">${esc(g.note)}</span>`:''}</p>`).join('')}`;
 }
 // 분석기 켜기·끄기(2026-11-24). 끄기: cam/anaCmd 에 stop 을 쓰면 분석기가 지금 파일까지 하고 1분 안에 멈춘다.
 // 켜기: 이 페이지에는 비밀 열쇠를 둘 수 없어서 GitHub '분석기 대신 켜기' 실행 화면을 연다(저장소 권한이 있는 운영진만)
@@ -1227,6 +1236,7 @@ async function loadSdk(cfg){
       // 자동 분석기 상태(Colab 1순위 / Kaggle 2순위, 2026-11-23)
       F.onSnapshot(F.doc(ST.db,'pub',code,'cam','ana'),s=>{ST.anaRun=s.exists()?s.data():null;if(ST.tab==='admin')render()},()=>{});
       // 운동장 네 점: 분석기가 보낸 첫 장면과 저장된 네 점(2026-11-24). 네 점을 찍는 중에는 화면을 다시 그리지 않는다
+      F.onSnapshot(F.doc(ST.db,'pub',code,'cam','gpu'),s=>{ST.gpu=s.exists()?s.data():null;if(ST.tab==='admin'&&!ST.pk)render()},()=>{});
       F.onSnapshot(F.doc(ST.db,'pub',code,'cam','frame'),s=>{ST.camFrame=s.exists()?s.data():null;if(ST.tab==='admin'&&!ST.pk)render()},()=>{});
       F.onSnapshot(F.doc(ST.db,'pub',code,'cam','pitch'),s=>{ST.camPitch=s.exists()?s.data():null;if(ST.tab==='admin'&&!ST.pk)render()},()=>{});
       F.onSnapshot(F.doc(ST.db,'pub',code,'cam','marks'),s=>{ST.marks=(s.exists()&&s.data().list)||[];if(ST.tab==='admin')render()},()=>{});
