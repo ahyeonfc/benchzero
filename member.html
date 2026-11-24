@@ -913,6 +913,18 @@ function anaRunHtml(){
   const what=a.state==='starting'?'켜는 중':a.state==='busy'?`분석 중${a.file?' · '+esc(a.file):''}`:a.state==='stopped'?'꺼짐':'대기 중';
   return `<p class="${on?'':'bad'}" style="margin:.4rem 0 0">🧠 분석기: ${on?`${who} ${what}`:`꺼짐(마지막 ${who}, ${age<3600?Math.round(age/60)+'분':Math.round(age/3600)+'시간'} 전)`}${a.done?` · 오늘 ${a.done}개 분석`:''}${on?'':' · 일요일 오전엔 녹화를 시작하면 Kaggle 이 5~10분 안에 대신 켜져요'}</p>${anaBtnHtml(on)}${gpuListHtml()}`;
 }
+// 골고에서 보낸 명령을 촬영 폰이 어떻게 처리했는지(앱 0.6.8~ cam/state 의 cmdOp·cmdResult·cmdMs·camReady, 2026-11-24)
+function cmdResultHtml(){
+  const c=ST.cam;if(!c)return '';
+  const out=[];
+  if(c.camReady===false&&!c.rec)out.push(`<p class="bad" style="margin:.3rem 0 0">촬영 폰 카메라가 꺼져 있어요. 골고 캠 화면을 켜 두세요.</p>`);
+  if(c.cmdOp&&c.cmdMs&&Date.now()-c.cmdMs<10*60000){
+    const L={start:'녹화 시작',stop:'녹화 정지',quarterStart:'쿼터 시작',quarterEnd:'쿼터 종료',upload:'업로드 설정',lens:'렌즈',position:'촬영 위치',makeQuarter:'쿼터 영상 만들기'};
+    const bad=/실패|무시/.test(c.cmdResult||'');
+    out.push(`<p class="${bad?'bad':'hint'}" style="margin:.3rem 0 0">최근 명령: ${esc(L[c.cmdOp]||c.cmdOp)} → ${esc(c.cmdResult||'')} (${Math.max(0,Math.round((Date.now()-c.cmdMs)/1000))}초 전)</p>`);
+  }
+  return out.join('');
+}
 // 지금 켜진 GPU(2026-11-24): 운영 분석기(cam/ana) + 시험 노트북들(cam/gpu {이름: {who, kind, name, state, hb, note}})
 // 시험 노트북은 1분마다 cam/gpu 의 자기 칸에 신호를 남긴다. 3분 넘게 신호가 없으면 꺼진 것으로 본다
 function gpuListHtml(){
@@ -946,7 +958,7 @@ const PITCH_MARKS=[['nl','가까운 왼쪽 코너',(w,h)=>[0,0]],['nh','가까�
   ['fl','먼 왼쪽 코너',(w,h)=>[0,h]],['fh','먼 쪽 하프라인 끝',(w,h)=>[w/2,h]],['fr','먼 오른쪽 코너',(w,h)=>[w,h]],['cc','센터 서클 가운데',(w,h)=>[w/2,h/2]]];
 const POS_NAME={halfline:'하프라인',corner:'코너',other:'기타'};
 function pitchSetHtml(){
-  const f=ST.camFrame,pos=(f&&f.position)||'halfline',saved=(ST.camPitch||{})[pos];
+  const f=ST.camFrame,pos=(f&&f.position)||(ST.cam&&ST.cam.pos)||'halfline',saved=(ST.camPitch||{})[pos];   // 첫 장면이 없으면 촬영 폰이 보고한 위치
   const head=`<h3 style="margin:1rem 0 .3rem">운동장 네 점 <span class="hint">${esc(POS_NAME[pos]||pos)} 촬영</span></h3>`;
   if(!f||!f.jpg)return head+`<p class="hint">분석기가 켜지고 첫 1분 파일을 받으면 여기 촬영 화면이 나와요. 그 위에서 운동장 네 점을 눌러 주세요. 네 점이 있어야 뛴 거리·속도가 계산돼요.</p>`;
   const pk=ST.pk;
@@ -963,11 +975,11 @@ function pitchImg(f,pts,clickable){
   const dots=[];for(let i=0;pts&&i<pts.length/2;i++)dots.push(`<span style="position:absolute;left:${pts[i*2]*100}%;top:${pts[i*2+1]*100}%;transform:translate(-50%,-50%);width:1.4rem;height:1.4rem;border-radius:50%;background:#e53935;color:#fff;font-size:.8rem;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #fff">${i+1}</span>`);
   return `<img id="${clickable?'pkImg':''}" src="data:image/jpeg;base64,${f.jpg}" alt="촬영 화면" style="width:100%;display:block;border-radius:.5rem;${clickable?'cursor:crosshair':''}">${dots.join('')}`;
 }
-function pkStart(){const f=ST.camFrame,pos=(f&&f.position)||'halfline',s=(ST.camPitch||{})[pos];
+function pkStart(){const f=ST.camFrame,pos=(f&&f.position)||(ST.cam&&ST.cam.pos)||'halfline',s=(ST.camPitch||{})[pos];
   // 하프라인 옆에서는 가까운 코너가 잘리기 쉬워서 하프라인 끝·먼 코너·센터 서클을 먼저 권한다
   ST.pk={pts:[],marks:pos==='halfline'?['nh','fl','fr','cc']:['nl','nr','fr','fl'],w:(s&&s.w)||90,h:(s&&s.h)||60};render()}
 async function pkSave(){
-  const pk=ST.pk,f=ST.camFrame,pos=(f&&f.position)||'halfline';
+  const pk=ST.pk,f=ST.camFrame,pos=(f&&f.position)||(ST.cam&&ST.cam.pos)||'halfline';
   const w=parseFloat(($('pkW')||{}).value)||pk.w,h=parseFloat(($('pkH')||{}).value)||pk.h;
   if(w<20||w>130||h<15||h>100){say('운동장 크기를 확인해 주세요(길이 20~130m, 폭 15~100m).','bad');return}
   const m=[];pk.marks.forEach(k=>m.push(...PITCH_MARKS.find(x=>x[0]===k)[2](w,h)));
@@ -1022,7 +1034,7 @@ function adminHtml(){
   const qa=sortedAna().filter(x=>a&&x.date===a.date);
   const marks=ST.marks.slice(-8).reverse();
   return `<div class="card"><h2>촬영 폰</h2>${camHtml()}
-    <div class="row" style="margin-top:.6rem"><button class="pri" data-cmd="start">녹화 시작</button><button data-cmd="stop">녹화 정지</button></div><p class="hint">촬영 폰 앱이 켜져 있어야 동작해요. 쿼터 시작·종료는 관리 화면의 킥오프·종료 버튼이 자동으로 보내요.</p></div>
+    <div class="row" style="margin-top:.6rem"><button class="pri" data-cmd="start">녹화 시작</button><button data-cmd="stop">녹화 정지</button></div>${cmdResultHtml()}<p class="hint">촬영 폰에 골고 캠 화면이 켜져 있어야 동작해요(같은 폰이면 골고 캠 안의 골고 탭에서 누르세요). 쿼터 시작·종료는 관리 화면의 킥오프·종료 버튼이 자동으로 보내요.</p></div>
   <div class="card"><h2>장면 표시</h2><div class="row"><input id="markTxt" placeholder="예: 3번 골, 수비 실수"><button class="pri" data-act="mark" style="flex:0 0 auto">지금 표시</button></div>
     <ul class="list">${marks.map(x=>`<li>${hm(x.ts)} ${x.q?x.q+'쿼터 · ':''}${esc(x.text)}</li>`).join('')||'<li class="hint">아직 표시한 장면이 없어요.</li>'}</ul></div>
   ${a?`<div class="card"><h2>쿼터 영상 링크 · ${dLabel(a.date)}</h2>${qa.map(x=>`<div class="row" style="margin:.3rem 0"><span style="flex:0 0 3.2rem">${x.q}쿼터</span><input data-yt="${esc(x.id)}" value="${esc((x.video&&x.video.yt)||'')}" placeholder="유튜브 링크 붙여넣기"></div>`).join('')}<button class="pri" data-act="saveYt" style="width:100%;margin-top:.4rem">영상 링크 저장</button></div>
