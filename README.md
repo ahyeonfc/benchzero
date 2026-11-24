@@ -1,4 +1,6 @@
-# 벤치제로 — 조기축구 출전 로테이션 앱
+# 골고 — 조기축구 출석·로테이션·경기 분석
+
+주소: https://ahyeonfc.github.io/goalgo/ (2026-11-24 저장소 이름 benchzero → goalgo). Firebase 프로젝트 id(benchzero-50f14)는 바꿀 수 없어 그대로 쓴다.
 
 출석 체크, 쿼터별 출전 로테이션, 작전판, 경기 기록을 관리하는 무료 웹앱입니다.
 휴대폰에서 "홈 화면에 추가"하면 앱처럼 실행되고, 인터넷이 끊겨도 동작합니다.
@@ -11,10 +13,10 @@
 
 ## 1. GitHub Pages에 올리기 (무료)
 1. github.com 로그인 → 오른쪽 위 `+` → **New repository**
-2. 이름 `benchzero`, **Public** 선택 → **Create repository**
+2. 이름 `goalgo`, **Public** 선택 → **Create repository**
 3. **uploading an existing file** 클릭 → 위 파일 7개를 끌어다 놓기 → **Commit changes**
 4. 저장소 **Settings → Pages** → Branch를 `main`, 폴더 `/ (root)` → **Save**
-5. 1~2분 뒤 `https://내아이디.github.io/benchzero/` 로 접속
+5. 1~2분 뒤 `https://내아이디.github.io/goalgo/` 로 접속
 
 ## 2. Firebase 만들기 (무료 Spark 요금제, 카드 등록 없음)
 1. console.firebase.google.com → **프로젝트 추가** → 이름 `benchzero` → 애널리틱스 끄기 → 만들기
