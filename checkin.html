@@ -14,6 +14,10 @@ html{font-size:clamp(15px,calc(100vw/24),20px)}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;line-height:1.5;-webkit-tap-highlight-color:transparent}
 header{background:var(--deep);color:#fff;padding:calc(.9rem + env(safe-area-inset-top)) 1.1rem .9rem}
 header h1{margin:0;font-size:1.25rem}header p{margin:.1rem 0 0;font-size:.85rem;opacity:.85}
+/* 회원 화면(member.html)과 같은 탭 줄: 출석 · 경기 · 내 카드 (2026-11-23) */
+.tabs{display:flex;gap:.3rem;margin-top:.5rem;overflow-x:auto}
+.tabs a{display:inline-flex;align-items:center;color:#fff;text-decoration:none;border:1px solid #ffffff44;min-height:2.3rem;padding:0 .8rem;border-radius:2rem;font-size:.9rem;font-weight:700;white-space:nowrap}
+.tabs a.on{background:#fff;color:var(--deep)}
 main{padding:1rem 1rem calc(2rem + env(safe-area-inset-bottom));max-width:560px;margin:0 auto}
 .card{background:var(--card);border:1px solid var(--line);border-radius:1rem;padding:1rem;margin-bottom:1rem}
 h2{font-size:1.05rem;margin:0 0 .6rem}
@@ -40,7 +44,7 @@ ol li span.t{margin-left:auto;color:var(--mute);font-size:.9rem}
 </style>
 </head>
 <body>
-<header><h1 id="title">골고 출석</h1><p id="today"></p><p><a href="member.html" style="color:inherit;font-weight:700">내 경기 분석 보기 →</a></p></header>
+<header><h1 id="title">골고 출석</h1><p id="today"></p><nav class="tabs"><a class="on" href="#">출석</a><a href="member.html?tab=game">경기</a><a href="member.html?tab=mine">내 카드</a></nav></header>
 <main>
 <div id="app"><p class="ld">불러오는 중…</p></div>
 <div class="card" id="listCard" hidden>

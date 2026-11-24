@@ -143,7 +143,8 @@ const pct=v=>v==null?'-':Math.round(v>1?v:v*100)+'%';
 
 // 상태
 const ST={conf:null,test:false,me:null,P:null,F:null,db:null,auth:null,A:null,user:null,admin:false,linkAdmin:false,
-  ana:[],claims:{},norm:null,rankAge:false,sel:null,tab:'game',rank:'q',cam:null,marks:[],msg:'',mcls:'',q:'',confirm:null,err:'',mine:{},crops:{},cropLd:{},idx:null,loadedDates:new Set(),frameLd:{},allLoaded:false,sdkP:null,sugNo:{},reFind:{},pick:{},fteam:{},att:{},attSet:{},more:{},prof:{}};
+  // 출석 화면의 탭(member.html?tab=mine)에서 오면 그 탭으로 연다
+  ana:[],claims:{},norm:null,rankAge:false,sel:null,tab:(/[?&]tab=(game|mine)\b/.exec(location.search)||[0,'game'])[1],rank:'q',cam:null,marks:[],msg:'',mcls:'',q:'',confirm:null,err:'',mine:{},crops:{},cropLd:{},idx:null,loadedDates:new Set(),frameLd:{},allLoaded:false,sdkP:null,sugNo:{},reFind:{},pick:{},fteam:{},att:{},attSet:{},more:{},prof:{}};
 
 // 축구회 코드 읽기: 출석(checkin.html)과 같은 저장 키(bz-ci, bz-me)를 쓴다
 function readConf(){
@@ -887,7 +888,7 @@ function camHtml(){
   return `<p><span class="pill ${c.rec?'on':'off'}">${c.rec?'● 녹화 중':'정지'}</span> ${c.rec&&c.sinceMs?hm(c.sinceMs)+'부터':''} <span class="hint">${age==null?'':stale?`⚠ ${Math.round(age/60)}분째 소식 없음`:`${age}초 전 소식`}</span></p>
   <div class="kpi"><div><b>${c.seg??'-'}</b><span>1분 파일 번호</span></div><div><b class="${c.battery!=null&&c.battery<=20?'bad':''}">${c.battery??'-'}%</b><span>배터리</span></div><div><b class="${c.tempC!=null&&c.tempC>=42?'bad':''}">${c.tempC!=null?Math.round(c.tempC)+'°':'-'}</b><span>온도</span></div>
   <div><b class="${c.freeMin!=null&&c.freeMin<30?'bad':''}">${c.freeMin!=null?Math.round(c.freeMin)+'분':'-'}</b><span>남은 녹화</span></div><div><b>${c.upDone??0}/${c.upTotal??0}</b><span>드라이브 업로드</span></div><div><b>${c.quarterFiles??'-'}</b><span>폰의 쿼터 영상</span></div></div>
-  ${camSetHtml(c)}`;
+  ${camHeatHtml(c)}${anaRunHtml()}${camSetHtml(c)}`;
 }
 // 촬영 설정 원격 조종(2026-11-23): 앱 0.6.4 부터 cam/state 에 upMode·lens·pos 가 오고, cam/cmd {op, v} 를 받는다
 const CAM_UP=[['OFF','꺼짐'],['WIFI_ONLY','와이파이만'],['WITH_MOBILE','모바일 데이터 포함']];
@@ -903,6 +904,20 @@ function camSetHtml(c){
   ${c.rec?'<p class="hint" style="margin:0">녹화 중에는 렌즈·위치를 바꿀 수 없어요.</p>':''}
   <div class="row" style="margin-top:.6rem"><button data-cmd="makeQuarter" ${c.canQuarter?'':'disabled'}>방금 쿼터 영상 만들기</button></div>
   ${c.quarterInfo?`<p class="hint" style="margin:.3rem 0 0">${esc(c.quarterInfo)}</p>`:''}${c.app?`<p class="hint" style="margin:.3rem 0 0">촬영 앱 ${esc(c.app)}</p>`:''}`;
+}
+// 자동 분석기(cam/ana): 경기 날 PC 의 Colab 이 1순위, 꺼져 있으면 Kaggle 이 대신 켜진다
+function anaRunHtml(){
+  const a=ST.anaRun;if(!a||!a.hb)return `<p class="hint" style="margin:.4rem 0 0">분석기: 아직 켜진 적 없음</p>`;
+  const age=Math.round((Date.now()-a.hb)/1000),who=a.who==='kaggle'?'Kaggle':'Colab';
+  const on=a.state!=='stopped'&&age<180;
+  const what=a.state==='starting'?'켜는 중':a.state==='busy'?`분석 중${a.file?' · '+esc(a.file):''}`:a.state==='stopped'?'꺼짐':'대기 중';
+  return `<p class="${on?'':'bad'}" style="margin:.4rem 0 0">🧠 분석기: ${on?`${who} ${what}`:`꺼짐(마지막 ${who}, ${age<3600?Math.round(age/60)+'분':Math.round(age/3600)+'시간'} 전)`}${a.done?` · 오늘 ${a.done}개 분석`:''}${on?'':' · 녹화를 시작하면 Kaggle 이 5~10분 안에 대신 켜져요'}</p>`;
+}
+// 발열(촬영 앱 0.6.6~): 폰 발열 단계 0~6. 3(심각)이면 업로드를 멈추고, 오래가면 1080p 로 낮춘다
+function camHeatHtml(c){
+  if(c.thermal==null||c.thermal<2)return '';
+  const t=c.thermal>=4?'과열 위험':c.thermal===3?'과열 심각 · 업로드를 잠시 멈췄어요':'발열 보통';
+  return `<p class="${c.thermal>=3?'bad':''}" style="margin:.4rem 0 0">🌡 ${t}${c.res==='1080p'?' · 1080p 로 낮춰 녹화 중':''}. 그늘에 두고, 보조배터리는 충전이 끝나면 빼 주세요.</p>`;
 }
 // ---------- 기준 다시 맞추기(운영진) ----------
 const NORM_NAMES={mpm:'분당 거리 m',vol:'운동량 m/쿼터',cov:'활동 범위 %',agi:'방향 전환 회/쿼터',stm:'스태미나',hhk:'후반 고강도 유지',apo:'박스 진입 회/쿼터',
@@ -1147,6 +1162,8 @@ async function loadSdk(cfg){
     ST.F=F;ST.db=F.getFirestore(app);initAuth(app);
     if(ST.conf){const code=ST.conf.code;
       F.onSnapshot(F.doc(ST.db,'pub',code,'cam','state'),s=>{ST.cam=s.exists()?s.data():null;if(ST.tab==='admin')render()},()=>{});
+      // 자동 분석기 상태(Colab 1순위 / Kaggle 2순위, 2026-11-23)
+      F.onSnapshot(F.doc(ST.db,'pub',code,'cam','ana'),s=>{ST.anaRun=s.exists()?s.data():null;if(ST.tab==='admin')render()},()=>{});
       F.onSnapshot(F.doc(ST.db,'pub',code,'cam','marks'),s=>{ST.marks=(s.exists()&&s.data().list)||[];if(ST.tab==='admin')render()},()=>{});
       setInterval(()=>{if(ST.tab==='admin')render()},30000)}
     return true;
