@@ -916,10 +916,12 @@ function anaRunHtml(){
 // 분석기 켜기·끄기(2026-11-24). 끄기: cam/anaCmd 에 stop 을 쓰면 분석기가 지금 파일까지 하고 1분 안에 멈춘다.
 // 켜기: 이 페이지에는 비밀 열쇠를 둘 수 없어서 GitHub '분석기 대신 켜기' 실행 화면을 연다(저장소 권한이 있는 운영진만)
 const ANA_RUN_URL='https://github.com/ahyeonfc/matchcam/actions/workflows/kaggle-fallback.yml';
+// 경기 날 자동 노트북(드라이브 '골고_자동분석.ipynb'). 운영자 구글 계정으로만 열린다
+const ANA_COLAB_URL='https://colab.research.google.com/drive/1mrJ2_6wRg7tdyVgPqhS-Up-UAhjrYkum';
 function anaBtnHtml(on){
   if(!(ST.admin||ST.linkAdmin))return '';
-  return `<div class="row" style="margin-top:.5rem">${on?`<button data-act="anaStop">분석기 끄기</button>`:`<button data-act="anaRun">분석기 켜기(Kaggle)</button>`}</div>
-  ${on?'':`<p class="hint" style="margin:.3rem 0 0">GitHub 화면이 열리면 <b>Run workflow</b> → '지금 켜기' 체크 → <b>Run workflow</b>. 5~10분 뒤 여기 '분석 중·대기 중'으로 바뀌어요.</p>`}`;
+  return `<div class="row" style="margin-top:.5rem">${on?`<button data-act="anaStop">분석기 끄기</button>`:`<button data-act="anaColab">Colab 켜기</button><button data-act="anaRun">Kaggle 켜기</button>`}</div>
+  ${on?'':`<p class="hint" style="margin:.3rem 0 0"><b>Colab</b>: 노트북이 열리면 위 메뉴 <b>런타임 → 모두 실행</b>(그 창을 닫지 마세요). <b>Kaggle</b>: GitHub 에 로그인한 뒤 <b>Run workflow</b> → '지금 켜기' 체크 → <b>Run workflow</b>(GitHub 로그인이 안 돼 있으면 404 가 나와요). 5~10분 뒤 여기 '분석 중·대기 중'으로 바뀌어요.</p>`}`;
 }
 async function anaStop(){
   if(!confirm('분석기를 끌까요?\n\n지금 분석 중인 1분 파일까지 마치고 1분 안에 멈춰요. 그 뒤 올라오는 영상은 분석되지 않아요.'))return;
@@ -1078,6 +1080,7 @@ document.addEventListener('click',e=>{
   if(k==='checkin'){location.href=checkinHref();return}
   if(k==='anaStop'){anaStop();return}
   if(k==='anaRun'){window.open(ANA_RUN_URL,'_blank','noopener');return}
+  if(k==='anaColab'){window.open(ANA_COLAB_URL,'_blank','noopener');return}
   if(k==='yes')bind();else if(k==='no'){ST.confirm=null;render()}
   else if(['refind','sugYes','sugNo','mineYes','pickNo','more'].includes(k)){const a=curAna();if(!a)return;
     if(k==='refind'){ST.reFind[a.id]=true;ST.sugNo[a.id]=true;render()}else if(k==='sugNo'){ST.sugNo[a.id]=true;render()}else if(k==='pickNo'){ST.pick[a.id]=null;render()}
