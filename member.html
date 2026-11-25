@@ -267,8 +267,10 @@ function bannerHtml(){
 }
 // 오른쪽 위 메뉴(⋯): 운영진도 회원과 같은 링크로 들어와 여기서 로그인한다. 로그인하면 "로그아웃"
 function menuHtml(){
-  if(ST.user)return `<p>${esc(ST.user.email)}<br>${ST.admin?'운영진으로 로그인됨':'운영진 목록에 없는 계정이에요'}</p><button data-act="logout" role="menuitem">로그아웃</button>`;
-  return `<button data-act="login" role="menuitem">운영진 로그인</button>${ST.linkAdmin?'<button data-act="oldAdmin" role="menuitem">로테이션·작전판 관리 화면</button>':''}`;
+  // 골고 앱(2026-11-25): 카톡 등으로 받은 골고 링크(출석·회원·운영진 연결 링크)를 앱에서 열기
+  const paste=window.GoalGo?'<button data-act="pasteLinkPrompt" role="menuitem">받은 링크 붙여넣어 열기</button>':'';
+  if(ST.user)return paste+ `<p>${esc(ST.user.email)}<br>${ST.admin?'운영진으로 로그인됨':'운영진 목록에 없는 계정이에요'}</p><button data-act="logout" role="menuitem">로그아웃</button>`;
+  return paste+`<button data-act="login" role="menuitem">운영진 로그인</button>${ST.linkAdmin?'<button data-act="oldAdmin" role="menuitem">로테이션·작전판 관리 화면</button>':''}`;
 }
 function adminEntryHtml(){return ''}
 function pickHtml(m){
@@ -1192,6 +1194,9 @@ document.addEventListener('click',e=>{
   else if(k==='banOff'){let off=[];try{off=JSON.parse(localStorage.getItem('bz-banoff')||'[]')}catch(e){}off=[...off,ac.dataset.t].slice(-60);try{localStorage.setItem('bz-banoff',JSON.stringify(off))}catch(e){}render()}
   else if(k==='normOpen'){say('최근 기록을 불러오는 중이에요…');loadAllDates().then(()=>{ST.normOpen=true;ST.msg='';render()})}else if(k==='normClose'){ST.normOpen=false;render()}
   else if(k==='normApply'){if(ST.normProp)saveNorm(ST.normProp)}else if(k==='normReset')saveNorm(null);
+  // 골고 앱 안에서는 구글이 웹 로그인을 막아 브라우저로 넘어가면 "missing initial state" 로 실패한다(2026-11-25). 앱 안 구글 로그인을 만들기 전까지 안내만
+  else if(k==='login'&&window.GoalGo&&!(window.GoalGo.googleIdToken))say('골고 앱에서는 아직 구글 로그인이 안 돼요. 메뉴(⋯)의 "받은 링크 붙여넣어 열기"에 운영진 연결 링크를 넣거나, 크롬에서 로그인해 주세요.','bad');
+  else if(k==='pasteLinkPrompt'){const v=(prompt('카톡 등으로 받은 골고 링크를 붙여넣으세요\n(출석 링크·회원 링크·운영진 연결 링크)')||'').trim();if(!v)return;if(!/^https:\/\/ahyeonfc\.github\.io\/goalgo\//.test(v)){say('골고 링크가 아니에요. https://ahyeonfc.github.io/goalgo/ 로 시작하는 링크를 붙여넣어 주세요.','bad');return}location.href=v;setTimeout(()=>location.reload(),300)}
   else if(k==='login')login();else if(k==='logout'){ST.A&&ST.A.signOut(ST.auth)}
   else if(k==='oldAdmin'){try{sessionStorage.setItem('bz-admin','1')}catch(err){}location.href='index.html'}
   // 골고 앱: 받은 링크로 열기(주소 뒤 #ci-… 만 다르면 페이지가 다시 열리지 않아 새로 고친다)
