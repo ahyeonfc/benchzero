@@ -12,8 +12,10 @@
 *{box-sizing:border-box}
 html{font-size:clamp(15px,calc(100vw/24),20px)}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;line-height:1.5;-webkit-tap-highlight-color:transparent}
-header{background:var(--deep);color:#fff;padding:calc(.9rem + env(safe-area-inset-top)) 1.1rem .9rem}
-header h1{margin:0;font-size:1.25rem}header p{margin:.1rem 0 0;font-size:.85rem;opacity:.85}
+/* [수정] 2026-11-25 머리를 회원 화면(member.html)과 같게: 같은 높이·글자 크기, 오른쪽 작은 글씨, 위에 고정 */
+header{background:var(--deep);color:#fff;padding:calc(.8rem + env(safe-area-inset-top)) 1rem .6rem;position:sticky;top:0;z-index:5}
+header h1{margin:0;font-size:1.15rem;display:flex;align-items:center;gap:.5rem}
+header h1 small{font-size:.8rem;font-weight:500;opacity:.85;margin-left:auto}
 /* 회원 화면(member.html)과 같은 탭 줄: 출석 · 경기 · 내 카드 (2026-11-23) */
 .tabs{display:flex;gap:.3rem;margin-top:.5rem;overflow-x:auto}
 .tabs a{display:inline-flex;align-items:center;color:#fff;text-decoration:none;border:1px solid #ffffff44;min-height:2.3rem;padding:0 .8rem;border-radius:2rem;font-size:.9rem;font-weight:700;white-space:nowrap}
@@ -44,7 +46,7 @@ ol li span.t{margin-left:auto;color:var(--mute);font-size:.9rem}
 </style>
 </head>
 <body>
-<header><h1 id="title">골고 출석</h1><p id="today"></p><nav class="tabs"><a class="on" href="#">출석</a><a href="member.html?tab=game">경기</a><a href="member.html?tab=mine">내 카드</a></nav></header>
+<header><h1><span id="title">골고</span><small id="today"></small></h1><nav class="tabs" id="tabs"><a class="on" href="#">출석</a><a href="member.html?tab=game">경기</a><a href="member.html?tab=mine">내 카드</a></nav></header>
 <main>
 <div id="app"><p class="ld">불러오는 중…</p></div>
 <div class="card" id="listCard" hidden>
@@ -90,11 +92,16 @@ function evNext(P){const ds=today();if(Array.isArray(P.events)){const n=P.events
 const mineOf=id=>ST.me&&ST.list.find(x=>x.pid===ST.me.pid&&(x.ev||'')===id);
 function render(){
   const P=ST.P,app=$('app');
-  $('today').textContent=new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'});
+  // 오른쪽 작은 글씨: 회원 화면처럼 내 이름, 아직 모르면 오늘 날짜
+  $('today').textContent=ST.me?ST.me.name+' 님':new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'});
+  // 운영진 기기면 회원 화면과 같은 탭 줄에 관리·로테이션도 보여 준다(회원 화면이 기억해 둔 값)
+  let staff='';try{staff=localStorage.getItem('gg-staff')||''}catch(e){}
+  $('tabs').innerHTML='<a class="on" href="#">출석</a><a href="member.html?tab=game">경기</a><a href="member.html?tab=mine">내 카드</a>'+
+    (staff?'<a href="member.html?tab=admin">관리</a>':'')+(staff==='rot'?'<a href="index.html?admin">로테이션</a>':'');
   if(!ST.conf){app.innerHTML='<div class="card"><h2>링크가 필요해요</h2><p>운영자가 보낸 <b>출석 링크</b>나 운동장의 <b>QR코드</b>로 들어와 주세요.</p></div>';return}
   if(!P){app.innerHTML='<p class="ld">'+(ST.err?esc(ST.err):'불러오는 중…')+'</p>';return}
   // 서비스 이름을 골고로 바꿈(2026-11-23). 예전에 저장된 제목 "벤치제로"는 골고로 보여 준다
-  if(P.title)$('title').textContent=(P.title==='벤치제로'?'골고':P.title)+' 출석';
+  if(P.title)$('title').textContent=(P.title==='벤치제로'?'골고':P.title);
   $('listCard').hidden=false;
   const m=`<p class="msg ${ST.mcls}">${esc(ST.msg)}</p>`;
   if(!ST.me){

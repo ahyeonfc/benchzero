@@ -303,9 +303,14 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 .simbar .phrow{flex:1 1 100%;display:flex;gap:.375rem}.simbar .big{flex:1 1 55%;writing-mode:horizontal-tb;white-space:nowrap}.simbar .ph{flex:1 1 0;min-height:2.4rem;font-weight:700;border-style:dashed}.simbar .ph.busy{opacity:.6}
 .simtop{display:flex;gap:.375rem;margin:0 0 .5rem}.simtop button{flex:1;min-height:2.6rem}
 .board,.board *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}.board textarea{-webkit-user-select:text;user-select:text}#pitch,#tokens .tok{touch-action:none}
+/* [추가] 2026-11-25 회원 화면·출석 화면과 같은 위쪽 탭 줄(출석 · 경기 · 내 카드 · 관리 · 로테이션). 따로 메뉴를 열지 않고 오간다 */
+.gtabs{display:flex;gap:.3rem;overflow-x:auto;background:var(--deep);padding:calc(.5rem + env(safe-area-inset-top)) .75rem .5rem}
+.gtabs a{display:inline-flex;align-items:center;color:#fff;text-decoration:none;border:1px solid #ffffff44;min-height:2.3rem;padding:0 .8rem;border-radius:2rem;font-size:.9rem;font-weight:700;white-space:nowrap}
+.gtabs a.on{background:#fff;color:var(--deep)}
 </style>
 </head>
 <body>
+<nav class="gtabs" id="gtabs" aria-label="골고 화면"><a href="checkin.html" data-ci>출석</a><a href="member.html?tab=game">경기</a><a href="member.html?tab=mine">내 카드</a><a href="member.html?tab=admin">관리</a><a class="on" href="#">로테이션</a></nav>
 <main class="band"><div class="wrap">
 
 <section class="view" data-view="att" id="attBox">
@@ -1589,6 +1594,10 @@ function photoUndo(){const u=PH.undo;if(!u||u.cur!==S.cur)return;const q=S.q[S.c
 $('toFull').addEventListener('click',()=>setSimple(false));
 $('toSimple').addEventListener('click',()=>setSimple(true));
 $('toMember').addEventListener('click',()=>{try{sessionStorage.removeItem('bz-admin')}catch(e){}location.href='member.html'});
+// 위쪽 탭 줄: 출석은 이 축구회의 출석 링크로 연다(코드가 없으면 출석 화면 기본 주소)
+$('gtabs').addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;
+  if(a.classList.contains('on')){e.preventDefault();return}
+  if(a.hasAttribute('data-ci')){e.preventDefault();let u='checkin.html';try{ciNorm();if(S.ci.code)u=ciLink()}catch(_){}location.href=u}});
 $('toSimple2').addEventListener('click',()=>setSimple(true));
 try{document.body.classList.toggle('simple',localStorage.getItem('jogi-simple')!=='0')}catch(e){document.body.classList.add('simple')}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b){setView(b.dataset.go);try{window.scrollTo(0,0)}catch(err){}}});
