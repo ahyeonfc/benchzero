@@ -1,5 +1,5 @@
 /* 골고 - 오프라인 캐시 */
-const VER='goalgo-v14';   // 킥오프·종료로 녹화 자동 켜고 끄기 안내(2026-11-25)
+const VER='goalgo-v15';   // 골고 앱 쿼터 영상 여러 개 차례로 올리기 안내(2026-11-25)
 const SHELL=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','checkin.html','member.html','qrcode.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(VER).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==VER).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
