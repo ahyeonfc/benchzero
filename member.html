@@ -22,6 +22,8 @@ header{position:sticky}.mbtn{min-height:1.9rem;width:2.1rem;padding:0;border:0;b
 .tabs button{background:transparent;color:#fff;border:1px solid #ffffff44;min-height:2.3rem;padding:0 .8rem;border-radius:2rem;font-size:.9rem;white-space:nowrap}
 .tabs button.on{background:#fff;color:var(--deep)}
 [data-quick] button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 .5rem}
+/* 관리자 이름 맞추기(2026-11-25): 사진은 작게 고정, 오른쪽에 회원 고르기 */
+.nmrow{display:flex;align-items:center;gap:.6rem}.nmrow .crop{width:4.2rem;height:5.6rem;flex:0 0 4.2rem;object-fit:cover;border-radius:.5rem;margin:0}.nmrow>div{flex:1;min-width:0}.nmrow select{width:100%;min-height:2.6rem}
 main{padding:1rem 1rem calc(2rem + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
 .card{background:var(--card);border:1px solid var(--line);border-radius:1rem;padding:1rem;margin-bottom:1rem}
 h2{font-size:1.05rem;margin:0 0 .6rem}h3{font-size:.95rem;margin:.8rem 0 .4rem}
@@ -1110,8 +1112,8 @@ function nameMatchHtml(a,qa){
   const done=rows.filter(r=>r.o).length,sugN=rows.filter(r=>!r.o&&r.sug).length;
   return `<div class="card"><h2>이름 맞추기 · ${dLabel(a.date)}</h2>${qb}
     <p class="hint" style="margin:0 0 .5rem">${a.q}쿼터 선수 ${tr.length}명 중 <b>${done}명</b> 맞춤${sugN?` · 추천 ${sugN}명`:''}. 사진을 보고 회원을 고르세요. 같은 날 한 쿼터를 맞추면 다음 쿼터는 <b>추천</b>이 미리 채워져요. 맞으면 저장만 누르면 돼요.</p>
-    <div style="display:grid;gap:.4rem">${rows.map(({t,o,sug})=>{const v=o||sug||'',s=a.stats&&a.stats[t.tid];
-      return `<div style="display:flex;align-items:center;gap:.5rem">${cropHtml(a,t.tid)}<div style="flex:1;min-width:0"><div class="hint" style="margin:0"><span class="dot" style="background:${teamColor(a,t.team)}"></span>${t.team?t.team+'팀 ':''}#${esc(t.tid)}${s&&s.distM?' · '+km(s.distM):''}${o?' · <b>맞춤</b>':sug?' · <b class="warn">추천</b>':''}</div>
+    <div class="nmlist" style="display:grid;gap:.5rem">${rows.map(({t,o,sug})=>{const v=o||sug||'',s=a.stats&&a.stats[t.tid];
+      return `<div class="nmrow">${cropHtml(a,t.tid)}<div style="flex:1;min-width:0"><div class="hint" style="margin:0"><span class="dot" style="background:${teamColor(a,t.team)}"></span>${t.team?t.team+'팀 ':''}#${esc(t.tid)}${s&&s.distM?' · '+km(s.distM):''}${o?' · <b>맞춤</b>':sug?' · <b class="warn">추천</b>':''}</div>
         <select data-pid="${esc(t.tid)}" style="width:100%"><option value="">(모름)</option>${N.map(n=>`<option value="${esc(n.id)}" ${n.id===v?'selected':''}>${esc(n.name)}</option>`).join('')}</select></div></div>`}).join('')}</div>
     <button class="pri" data-act="savePid" style="width:100%;margin-top:.6rem">이름 저장${sugN?' (추천 포함)':''}</button>
     <details class="axh" data-frame style="margin-top:.5rem"><summary>전체 장면에서 보기</summary>${frameHtml(a)}</details></div>`;
