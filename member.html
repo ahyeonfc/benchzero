@@ -21,6 +21,7 @@ header{position:sticky}.mbtn{min-height:1.9rem;width:2.1rem;padding:0;border:0;b
 .tabs{display:flex;gap:.3rem;margin-top:.5rem;overflow-x:auto}
 .tabs button{background:transparent;color:#fff;border:1px solid #ffffff44;min-height:2.3rem;padding:0 .8rem;border-radius:2rem;font-size:.9rem;white-space:nowrap}
 .tabs button.on{background:#fff;color:var(--deep)}
+[data-quick] button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 .5rem}
 main{padding:1rem 1rem calc(2rem + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
 .card{background:var(--card);border:1px solid var(--line);border-radius:1rem;padding:1rem;margin-bottom:1rem}
 h2{font-size:1.05rem;margin:0 0 .6rem}h3{font-size:.95rem;margin:.8rem 0 .4rem}
@@ -894,28 +895,41 @@ function camHtml(){
   ${camQuickHtml(c,stale)}${cmdResultHtml()}
   <div class="kpi"><div><b>${c.seg??'-'}</b><span>1분 파일 번호</span></div><div><b class="${c.battery!=null&&c.battery<=20?'bad':''}">${c.battery??'-'}%</b><span>배터리</span></div><div><b class="${c.tempC!=null&&c.tempC>=42?'bad':''}">${c.tempC!=null?Math.round(c.tempC)+'°':'-'}</b><span>온도</span></div>
   <div><b class="${c.freeMin!=null&&c.freeMin<30?'bad':''}">${c.freeMin!=null?Math.round(c.freeMin)+'분':'-'}</b><span>남은 녹화</span></div><div><b>${c.upDone??0}/${c.upTotal??0}</b><span>드라이브 업로드</span></div><div><b>${c.quarterFiles??'-'}</b><span>폰의 쿼터 영상</span></div></div>
-  ${camHeatHtml(c)}${anaRunHtml()}${camSetHtml(c)}${pitchSetHtml()}`;
+  ${camHeatHtml(c)}${keepDetails('camset','촬영 설정 · 쿼터 영상',camSetHtml(c))}`;
 }
+// [추가] 2026-11-25 접기 칸: 골고는 10초마다 다시 그려지므로 펼친 상태를 ST.open 에 기억한다(아래 toggle 감시)
+function keepDetails(key,title,body){
+  const o=(ST.open||{})[key];
+  return `<details data-keep="${key}" ${o?'open':''} style="margin-top:.7rem"><summary style="cursor:pointer;font-weight:700;padding:.3rem 0">${title}</summary>${body}</details>`;
+}
+document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.dataset&&d.dataset.keep){ST.open=ST.open||{};ST.open[d.dataset.keep]=d.open}},true);
 // [추가] 2026-11-25 경기 중 자주 누르는 버튼을 촬영 폰 상태 바로 아래에 모은다(스크롤 없이):
 //   녹화 시작·정지(하나로 바뀜, 정지는 확인 창) / 방금 쿼터 영상 만들기 / 쿼터 영상 받기(유튜브) / 카메라 화면 보기
 function camQuickHtml(c,stale){
   const inApp=!!(window.MatchCam&&typeof MatchCam.event==='function');   // 골고 캠 안의 골고(촬영 폰 자신)
   const fresh=!stale,b=[];
   b.push(`<button class="${c.rec?'':'pri'}" data-cmd="${c.rec?'stop':'start'}" style="grid-column:1/-1">${c.rec?'■ 녹화 정지':'● 녹화 시작'}</button>`);
-  b.push(`<button data-cmd="makeQuarter" ${c.canQuarter?'':'disabled'}>🎬 쿼터 영상 만들기</button>`);
+  b.push(`<button data-cmd="makeQuarter" ${c.canQuarter?'':'disabled'}>🎬 쿼터 만들기</button>`);
   // 쿼터 영상 받기: 골고 앱이면 앱이 받아 유튜브로, 브라우저면 같은 핫스팟·와이파이로 내려받기, 촬영 폰 자신이면 촬영 화면에서
+  const q=c.quarterFiles||0;
+  // 같은 폰(골고 앱 0.8.1~ 이 이 폰에 골고 캠이 있고 촬영 폰 주소가 이 폰이라고 알려 줌): 카메라 화면 보기 = 골고 캠 열기
+  let same=false;try{same=!!(window.GoalGo&&GoalGo.isSamePhone&&GoalGo.isSamePhone(c.liveUrl||''))}catch(_){}
   if(inApp)b.push(`<button data-camview="app">📷 촬영 화면으로</button>`);
   else{
-    const q=c.quarterFiles||0;
-    if(window.GoalGo)b.push(`<button data-camview="receive" ${q&&fresh?'':'disabled'}>⬇ 유튜브로 올리기${q?` (${q})`:''}</button>`);
-    else b.push(`<button data-camview="quarters" ${q&&fresh&&c.liveUrl?'':'disabled'}>⬇ 영상 받기${q?` (${q})`:''}</button>`);
-    b.push(`<button data-camview="live" ${c.liveUrl&&fresh?'':'disabled'} style="grid-column:1/-1">📷 카메라 화면 보기${c.liveViewers?` (${c.liveViewers}명 보는 중)`:''}</button>`);
+    if(window.GoalGo)b.push(`<button data-camview="receive" ${q&&fresh?'':'disabled'}>⬇ 유튜브 올리기</button>`);
+    else b.push(`<button data-camview="quarters" ${q&&fresh&&c.liveUrl?'':'disabled'}>⬇ 영상 받기</button>`);
   }
+  if(!inApp){
+    if(same)b.push(`<button data-camview="openCam">📷 촬영 화면 열기</button>`);
+    else b.push(`<button data-camview="live" ${c.liveUrl&&fresh?'':'disabled'}>📷 카메라 화면</button>`);
+  }
+  // [추가] 2026-11-25 유튜브에 올린 뒤 바로 지울 수 있게 촬영 폰 쿼터 영상 지우기도 여기에(확인 창)
+  b.push(`<button data-cmd="deleteQuarters" ${q&&fresh?'':'disabled'}>🗑 영상 지우기</button>`);
   const notes=[];
   if(c.quarterInfo)notes.push(esc(c.quarterInfo));
-  if(!inApp&&!c.liveUrl&&!window.GoalGo)notes.push('쿼터 영상 받기·카메라 화면 보기는 촬영 폰을 내 폰 핫스팟(또는 같은 와이파이)에 연결하면 켜져요.');
-  if(!inApp&&!c.liveUrl&&window.GoalGo)notes.push('카메라 화면 보기는 촬영 폰을 내 폰 핫스팟(또는 같은 와이파이)에 연결하면 켜져요.');
-  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin:.2rem 0 .3rem">${b.join('')}</div>${notes.map(n=>`<p class="hint" style="margin:.2rem 0 0">${n}</p>`).join('')}`;
+  if(!inApp&&!same&&!c.liveUrl&&!window.GoalGo)notes.push('영상 받기·카메라 화면은 촬영 폰을 내 폰 핫스팟(또는 같은 와이파이)에 연결하면 켜져요.');
+  if(!inApp&&!same&&!c.liveUrl&&window.GoalGo)notes.push('카메라 화면은 촬영 폰을 내 폰 핫스팟(또는 같은 와이파이)에 연결하면 켜져요.');
+  return `<div data-quick style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin:.2rem 0 .3rem">${b.join('')}</div>${notes.map(n=>`<p class="hint" style="margin:.2rem 0 0">${n}</p>`).join('')}`;
 }
 // 카메라 화면 보기(2026-11-25, 앱 0.7.0~): 촬영 폰이 같은 핫스팟·와이파이 안에서 화면을 내보내는 주소(cam/state.liveUrl)를 연다.
 // 인터넷·데이터를 쓰지 않는 두 폰 사이 직접 연결이라, 보는 폰도 같은 핫스팟·와이파이에 붙어 있어야 한다.
@@ -950,9 +964,9 @@ function quarterDlHtml(c){
   if(!c.quarterFiles)return '';
   const fresh=c.ts&&Date.now()-c.ts<120000;
   const how=window.GoalGo
-    ?'위쪽 "유튜브로 올리기"를 누르면 촬영 폰의 가장 최근 쿼터 영상을 받아(촬영 폰이 이 폰이면 바로, 다른 폰이면 같은 핫스팟·와이파이로, 데이터 안 씀) 유튜브 업로드 화면을 열어요. 받은 영상은 2일 뒤 이 폰에서 자동으로 지워져요.'
+    ?'위쪽 "유튜브 올리기"를 누르면 촬영 폰의 가장 최근 쿼터 영상을 받아(촬영 폰이 이 폰이면 바로, 다른 폰이면 같은 핫스팟·와이파이로, 데이터 안 씀) 유튜브 업로드 화면을 열어요. 받은 영상은 2일 뒤 이 폰에서 자동으로 지워져요.'
     :'위쪽 "영상 받기"는 같은 핫스팟·와이파이로 촬영 폰에서 바로 받아요(데이터 안 씀, 25분 영상 약 3GB). 유튜브에 올린 뒤 내 폰의 다운로드 폴더에서 지워 주세요.';
-  return `<h3 style="margin:.8rem 0 .2rem">쿼터 영상</h3><p class="hint" style="margin:0">촬영 폰에 ${c.quarterFiles}개. ${how}</p>${fresh?`<div class="row" style="margin-top:.4rem"><button data-cmd="deleteQuarters">촬영 폰의 쿼터 영상 ${c.quarterFiles}개 지우기</button></div>`:''}`;
+  return `<h3 style="margin:.8rem 0 .2rem">쿼터 영상</h3><p class="hint" style="margin:0">촬영 폰에 ${c.quarterFiles}개. ${how} 유튜브에 다 올렸으면 위쪽 "영상 지우기"로 촬영 폰 공간을 비우세요.</p>`;
 }
 // 자동 분석기(cam/ana): 경기 날 PC 의 Colab 이 1순위, 꺼져 있으면 Kaggle 이 대신 켜진다
 function anaRunHtml(){
@@ -1084,18 +1098,22 @@ function adminHtml(){
   const a=curAna(),code=ST.conf.code,link=`matchcam://link?code=${encodeURIComponent(code)}`;
   const qa=sortedAna().filter(x=>a&&x.date===a.date);
   const marks=ST.marks.slice(-8).reverse();
+  // [수정] 2026-11-25 관리 탭 정리: 촬영 폰(맨 위) → 경기 분석(결과가 있을 때) → 더 보기(접힘) → 운영진 계정.
+  //   운동장 네 점 누르기는 뺐다(직접 누르지 않기로 함, 자동 인식 준비 중). 분석기·GPU·장면 표시·점수 기준·연결 QR 은 "더 보기"로
+  const markHtml=`<h3 style="margin:.6rem 0 .3rem">장면 표시</h3><p class="hint" style="margin:0 0 .3rem">경기 중 기억할 순간에 시각 꼬리표를 붙여요(영상에서 그 장면으로 건너뛰기는 아직 없음).</p><div class="row"><input id="markTxt" placeholder="예: 3번 골, 수비 실수"><button class="pri" data-act="mark" style="flex:0 0 auto">지금 표시</button></div>
+    <ul class="list">${marks.map(x=>`<li>${hm(x.ts)} ${x.q?x.q+'쿼터 · ':''}${esc(x.text)}</li>`).join('')||'<li class="hint">아직 표시한 장면이 없어요.</li>'}</ul>`;
+  const qrHtml=`<h3 style="margin:1rem 0 .3rem">촬영 폰 연결</h3><p class="hint" style="margin:0">처음 한 번: 골고 캠 앱에서 <b>골고 → 축구회 연결</b> 또는 폰 카메라로 아래 QR을 찍어 주세요.</p><div class="qr" id="camQr"></div><p class="hint" style="text-align:center;word-break:break-all">코드: <b>${esc(code)}</b></p>`;
+  // 운영진 계정: 지금은 운영진 연결 링크로 관리·로테이션이 다 되므로 구글 로그인은 "더 보기" 안에(보안 규칙 작업 때 다시 앞으로)
+  const acctHtml=`<h3 style="margin:1rem 0 .3rem">운영진 계정</h3>${ST.user?`<p>${esc(ST.user.email)} ${ST.admin?'<span class="pill on">운영진</span>':'<span class="pill off">목록에 없음</span>'}</p>`:'<p class="hint" style="margin:0 0 .3rem">이 휴대폰은 운영진 연결 링크로 관리 권한이 있어요. 구글 로그인은 지금은 쓰지 않아도 돼요.</p>'}
+    <div class="row">${ST.user?'<button data-act="logout">로그아웃</button>':'<button data-act="login">구글 로그인</button>'}</div>`;
+  const moreHtml=keepDetails('more','더 보기 · 분석기 · 장면 표시 · 연결 · 계정',`<h3 style="margin:.6rem 0 .3rem">분석기 <span class="hint">(정확도 90점 넘을 때까지 보류 중)</span></h3>${anaRunHtml()}${markHtml}${normAdminHtml()}${qrHtml}${acctHtml}`);
   return `<div class="card"><h2>촬영 폰</h2>${camHtml()}
-    <p class="hint">촬영 폰의 골고 캠이 켜져 있거나 "골고 연결 대기 중"이면 녹화 시작·정지를 받아요. 쿼터 시작·종료는 관리 화면의 킥오프·종료 버튼이 자동으로 보내요.</p></div>
-  <div class="card"><h2>장면 표시</h2><div class="row"><input id="markTxt" placeholder="예: 3번 골, 수비 실수"><button class="pri" data-act="mark" style="flex:0 0 auto">지금 표시</button></div>
-    <ul class="list">${marks.map(x=>`<li>${hm(x.ts)} ${x.q?x.q+'쿼터 · ':''}${esc(x.text)}</li>`).join('')||'<li class="hint">아직 표시한 장면이 없어요.</li>'}</ul></div>
+    <p class="hint">촬영 폰의 골고 캠이 켜져 있거나 "골고 연결 대기 중"이면 녹화 시작·정지를 받아요. 쿼터 시작·종료는 로테이션의 킥오프·종료 버튼이 자동으로 보내요.</p></div>
   ${a?`<div class="card"><h2>쿼터 영상 링크 · ${dLabel(a.date)}</h2>${qa.map(x=>`<div class="row" style="margin:.3rem 0"><span style="flex:0 0 3.2rem">${x.q}쿼터</span><input data-yt="${esc(x.id)}" value="${esc((x.video&&x.video.yt)||'')}" placeholder="유튜브 링크 붙여넣기"></div>`).join('')}<button class="pri" data-act="saveYt" style="width:100%;margin-top:.4rem">영상 링크 저장</button></div>
   <div class="card"><h2>선수 이름 고치기 · ${a.q}쿼터</h2><p class="hint" style="margin:0 0 .4rem">경기 탭에서 고른 쿼터예요. 추적 번호마다 선수를 지정하면 회원의 나 찾기보다 먼저 적용돼요.</p>
     <ul class="list">${(a.tracks||[]).map(t=>{const o=ownerOf(a,t.tid),s=a.stats&&a.stats[t.tid];return `<li><span style="flex:0 0 5.5rem">${t.team?t.team+'팀 ':''}#${esc(t.tid)}<br><small class="hint">${s?km(s.distM):''}${t.by?' · '+({board:'작전판',claim:'본인',admin:'운영진'}[t.by]||t.by):(!t.pid&&o?' · 본인':'')}</small></span><select data-pid="${esc(t.tid)}"><option value="">(모름)</option>${namesForFix(a).map(n=>`<option value="${esc(n.id)}" ${n.id===o?'selected':''}>${esc(n.name)}</option>`).join('')}</select></li>`}).join('')}</ul>
     <button class="pri" data-act="savePid" style="width:100%;margin-top:.4rem">이름 저장</button></div>`:''}
-  <div class="card"><h2>촬영 폰 연결</h2><p class="hint" style="margin:0">촬영 앱에서 <b>서버 연결 → QR 읽기</b>로 아래를 찍어 주세요.</p><div class="qr" id="camQr"></div><p class="hint" style="text-align:center;word-break:break-all">코드: <b>${esc(code)}</b></p></div>
-  ${normAdminHtml()}
-  <div class="card"><h2>운영진</h2>${ST.user?`<p>${esc(ST.user.email)} ${ST.admin?'<span class="pill on">운영진</span>':'<span class="pill off">목록에 없음</span>'}</p>`:'<p class="hint">이 휴대폰은 기존 연결 링크로 관리 권한이 있어요.</p>'}
-    <div class="row"><button data-act="oldAdmin">로테이션·작전판 관리 화면</button>${ST.user?'<button data-act="logout">로그아웃</button>':'<button data-act="login">구글 로그인</button>'}</div></div>`;
+  <div class="card">${moreHtml}</div>`;
 }
 function afterRender(){
   // 나 찾기 칸이 화면에 들어오면 그 쿼터 선수 사진을 받는다
@@ -1179,6 +1197,8 @@ document.addEventListener('click',e=>{
   const tb=t.closest('[data-tab]');if(tb){ST.tab=tb.dataset.tab;ST.msg='';render();window.scrollTo(0,0);return}
   const cv=t.closest('[data-camview]');if(cv){
     if(cv.dataset.camview==='app'){try{MatchCam.event(JSON.stringify({type:'showCamera',ts:Date.now()}))}catch(_){}}
+    // 골고 앱(0.8.1~): 같은 폰이면 골고 캠 앱을 연다(촬영 화면이 그대로 보임)
+    else if(cv.dataset.camview==='openCam'){try{GoalGo.openCamApp()}catch(_){}}
     // 골고 앱(2026-11-25): 쿼터 영상은 앱이 받고, 카메라 화면은 앱 안에서 연다(뒤로 가기로 골고에 돌아옴)
     else if(window.GoalGo&&ST.cam&&cv.dataset.camview==='receive'){try{GoalGo.receiveQuarter(ST.cam.liveUrl||'http://127.0.0.1:8765/');say('촬영 폰에서 쿼터 영상을 받기 시작했어요. 위쪽 띠에 진행 상황이 나와요.','ok')}catch(_){}}
     else if(window.GoalGo&&ST.cam&&ST.cam.liveUrl){try{GoalGo.openUrl(ST.cam.liveUrl+(cv.dataset.camview==='quarters'?'quarters':''))}catch(_){}}
