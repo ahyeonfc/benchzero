@@ -1181,6 +1181,8 @@ function nameMatchHtml(a,qa){
   if(!ST.crops[a.id])loadCrops(a.id);
   if(!(a.frame&&a.frame.jpg))loadFrame(a.id);
   const N=namesForFix(a);
+  // [추가] 2026-11-25 직접 입력한 이름(회원 아닌 사람, 학습용 정답): 같은 날 모든 쿼터에 저장된 lbl + 이번에 새로 적은 것
+  const L=[...new Set([...sortedAna().filter(x=>x.date===a.date).flatMap(x=>(x.tracks||[]).map(t=>t.lbl).filter(Boolean)),...((ST.newLbl&&ST.newLbl[a.date])||[])])].sort();
   // [수정] 2026-11-25 추천은 한 회원을 한 선수에게만: 선수마다 따로 1순위를 붙이면 같은 회원이 여러 선수에게 추천됐다.
   //   (선수, 회원, 점수) 후보를 모아 점수 높은 짝부터 정하고, 이미 정해진 회원·선수는 건너뛴다.
   //   후보 점수: 분석기 suggest(같은 날 앞 쿼터 모습)는 +1 을 더해 우선, cands(평소 습관)는 그대로
@@ -1190,13 +1192,15 @@ function nameMatchHtml(a,qa){
     (Array.isArray(t.cands)?t.cands:[]).forEach(c=>{if(c&&c.pid)pairs.push({tid:t.tid,pid:c.pid,sc:c.score||0})})});
   const sugOf={};pairs.sort((x,y)=>y.sc-x.sc).forEach(p=>{if(sugOf[p.tid]||used.has(p.pid))return;sugOf[p.tid]=p.pid;used.add(p.pid)});
   const rows=tr.map(t=>({t,o:own[t.tid],sug:own[t.tid]?null:(sugOf[t.tid]||null)}))
-    .sort((x,y)=>(!!x.o)-(!!y.o)||String(x.t.team||'').localeCompare(String(y.t.team||'')));
-  const done=rows.filter(r=>r.o).length,sugN=rows.filter(r=>!r.o&&r.sug).length;
+    .sort((x,y)=>(!!(x.o||x.t.lbl))-(!!(y.o||y.t.lbl))||String(x.t.team||'').localeCompare(String(y.t.team||'')));
+  const done=rows.filter(r=>r.o||r.t.lbl).length,sugN=rows.filter(r=>!r.o&&r.sug).length;
   return `<div class="card"><h2>이름 맞추기 · ${dLabel(a.date)}</h2>${qb}${ourTeamHtml(a,teams)}
     <p class="hint" style="margin:0 0 .5rem">${a.q}쿼터 선수 ${tr.length}명 중 <b>${done}명</b> 맞춤${sugN?` · 추천 ${sugN}명`:''}. 사진을 보고 회원을 고르세요. 같은 날 한 쿼터를 맞추면 다음 쿼터는 <b>추천</b>이 미리 채워져요. 맞으면 저장만 누르면 돼요.</p>
-    <div class="nmlist" style="display:grid;gap:.5rem">${rows.map(({t,o,sug})=>{const v=o||sug||'',s=a.stats&&a.stats[t.tid];
-      return `<div class="nmrow">${cropHtml(a,t.tid)}<div style="flex:1;min-width:0"><div class="hint" style="margin:0"><span class="dot" style="background:${teamColor(a,t.team)}"></span>${t.team?t.team+'팀 ':''}#${esc(t.tid)}${s&&s.distM?' · '+km(s.distM):''}${o?' · <b>맞춤</b>':sug?' · <b class="warn">추천</b>':''}</div>
-        <select data-pid="${esc(t.tid)}" style="width:100%"><option value="">(모름)</option>${N.map(n=>`<option value="${esc(n.id)}" ${n.id===v?'selected':''}>${esc(n.name)}</option>`).join('')}</select></div></div>`}).join('')}</div>
+    <div class="nmlist" style="display:grid;gap:.5rem">${rows.map(({t,o,sug})=>{
+      // 고르다 만 값(ST.pend) > 저장된 회원 > 저장된 직접 입력 이름(lbl:) > 추천
+      const pd=ST.pend&&ST.pend[a.id]&&ST.pend[a.id][t.tid],v=pd!=null?pd:(o||(t.lbl?'lbl:'+t.lbl:'')||sug||''),s=a.stats&&a.stats[t.tid];
+      return `<div class="nmrow">${cropHtml(a,t.tid)}<div style="flex:1;min-width:0"><div class="hint" style="margin:0"><span class="dot" style="background:${teamColor(a,t.team)}"></span>${t.team?t.team+'팀 ':''}#${esc(t.tid)}${s&&s.distM?' · '+km(s.distM):''}${o||t.lbl?' · <b>맞춤</b>':sug?' · <b class="warn">추천</b>':''}</div>
+        <select data-pid="${esc(t.tid)}" style="width:100%"><option value="">(모름)</option>${N.map(n=>`<option value="${esc(n.id)}" ${n.id===v?'selected':''}>${esc(n.name)}</option>`).join('')}${L.length?`<optgroup label="직접 입력한 이름">${L.map(x=>`<option value="lbl:${esc(x)}" ${'lbl:'+x===v?'selected':''}>${esc(x)}</option>`).join('')}</optgroup>`:''}<option value="__new">＋ 직접 입력…</option></select></div></div>`}).join('')}</div>
     <button class="pri" data-act="savePid" style="width:100%;margin-top:.6rem">이름 저장${sugN?' (추천 포함)':''}</button>
     <details class="axh" data-frame style="margin-top:.5rem"><summary>전체 장면에서 보기</summary>${frameHtml(a)}</details></div>`;
 }
@@ -1273,13 +1277,18 @@ async function savePid(){
   try{
     // 저장 직전 최신 문서를 다시 읽어 tracks 만 고친다(분석기가 그사이 바꾼 값을 덮지 않게)
     // 같은 사람을 두 선수에 고르지 않았는지 먼저 본다
-    const pick={};let dup=null;document.querySelectorAll('[data-pid]').forEach(el=>{const v=el.value;if(!v)return;if(pick[v])dup=v;pick[v]=1});
-    if(dup){const n=(ST.P.names||[]).find(x=>x.id===dup);say(`${n?n.name:dup} 님이 두 선수에 골라져 있어요. 한 명만 남겨 주세요.`,'bad');return}
+    // [수정] 2026-11-25 같은 사람이 중간에 끊겨 두 번호로 나뉘는 건 정상이라 막지 않고 확인만 받는다
+    const pick={},dups=[];document.querySelectorAll('[data-pid]').forEach(el=>{const v=el.value;if(!v||v==='__new')return;if(pick[v]&&!dups.includes(v))dups.push(v);pick[v]=1});
+    if(dups.length){const nm=v=>v.startsWith('lbl:')?v.slice(4):(((ST.P.names||[]).find(x=>x.id===v)||{}).name||v);
+      if(!confirm(`${dups.map(nm).join(', ')} 님이 두 선수 이상에 골라져 있어요.\n같은 사람이 중간에 끊겨 번호가 나뉜 거면 확인, 잘못 고른 거면 취소를 누르세요.`))return}
     const s=await F.getDoc(ref);if(!s.exists())return;const tr=(s.data().tracks||[]).map(t=>Object.assign({},t));let n=0;
-    document.querySelectorAll('[data-pid]').forEach(el=>{const t=tr.find(x=>String(x.tid)===el.dataset.pid);if(!t)return;const v=el.value||null,cur=ownerOf(a,t.tid);
-      if(v===cur)return;t.pid=v;t.by=v?'admin':null;n++});
+    document.querySelectorAll('[data-pid]').forEach(el=>{const t=tr.find(x=>String(x.tid)===el.dataset.pid);if(!t)return;let v=el.value||null;if(v==='__new')v=null;
+      const cur=ownerOf(a,t.tid)||(t.lbl?'lbl:'+t.lbl:null);if(v===cur)return;
+      // 직접 입력한 이름은 회원 기록에 들어가지 않게 pid 가 아니라 lbl 에 둔다(학습용 정답)
+      if(v&&v.startsWith('lbl:')){t.pid=null;t.lbl=v.slice(4);t.by='admin'}else{t.pid=v;t.lbl=null;t.by=v?'admin':null}n++});
     if(!n){say('바뀐 이름이 없어요.','ok');return}
-    await F.updateDoc(ref,{tracks:tr,updatedMs:Date.now()});say(`이름 ${n}개를 고쳤어요.`,'ok');
+    await F.updateDoc(ref,{tracks:tr,updatedMs:Date.now()});if(ST.pend)delete ST.pend[a.id];
+    const la=ST.ana.find(x=>x.id===a.id);if(la)la.tracks=tr;say(`이름 ${n}개를 고쳤어요.`,'ok');render();
   }catch(e){say('저장하지 못했어요.','bad')}
 }
 async function login(){
@@ -1357,6 +1366,12 @@ document.addEventListener('click',e=>{
 });
 // "전체 장면에서 보기"를 열면 첫 장면 사진을 받는다
 document.addEventListener('toggle',e=>{const d=e.target;if(d.matches&&d.matches('details[data-frame]')&&d.open){const a=curAna();if(a)loadFrame(a.id)}},true);
+// [추가] 2026-11-25 이름 맞추기: 고른 값을 저장 전까지 기억(화면이 10초마다 다시 그려져도 유지), "＋ 직접 입력…"이면 이름을 받는다
+document.addEventListener('change',e=>{const el=e.target.closest('select[data-pid]');if(!el)return;const a=curAna();if(!a)return;
+  ST.pend=ST.pend||{};const P=ST.pend[a.id]=ST.pend[a.id]||{},tid=el.dataset.pid;
+  if(el.value==='__new'){const nm=(prompt('이 선수의 이름(회원이 아닌 사람, 예: 민준, 빨간 조끼 7번)')||'').trim().slice(0,30);
+    if(!nm){render();return}ST.newLbl=ST.newLbl||{};(ST.newLbl[a.date]=ST.newLbl[a.date]||[]).push(nm);P[tid]='lbl:'+nm;render();return}
+  P[tid]=el.value},true);
 document.addEventListener('change',e=>{const md=e.target.closest('[data-mday]');if(md){ST.mday=md.value;render();return}const d=e.target.closest('[data-date]');if(d){const v=d.value,go=()=>{const L=sortedAna().filter(x=>x.date===v);if(L.length)ST.sel=L[0].id;ST.loadingDate=null;render()};
   // 다른 경기를 고르면 그 경기만 그때 받는다
   if(ST.loadedDates.has(v))go();else{ST.loadingDate=v;render();loadDates([v]).then(go).catch(()=>{ST.loadingDate=null;say('불러오지 못했어요.','bad')})}}});
