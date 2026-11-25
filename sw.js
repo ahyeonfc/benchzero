@@ -1,5 +1,5 @@
 /* 골고 - 오프라인 캐시 */
-const VER='goalgo-v13';   // 관리 탭 정리, 같은 폰이면 촬영 화면 열기, 영상 지우기 위로(2026-11-25)
+const VER='goalgo-v14';   // 킥오프·종료로 녹화 자동 켜고 끄기 안내(2026-11-25)
 const SHELL=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','checkin.html','member.html','qrcode.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(VER).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==VER).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

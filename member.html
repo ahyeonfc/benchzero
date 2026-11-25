@@ -1108,7 +1108,7 @@ function adminHtml(){
     <div class="row">${ST.user?'<button data-act="logout">로그아웃</button>':'<button data-act="login">구글 로그인</button>'}</div>`;
   const moreHtml=keepDetails('more','더 보기 · 분석기 · 장면 표시 · 연결 · 계정',`<h3 style="margin:.6rem 0 .3rem">분석기 <span class="hint">(정확도 90점 넘을 때까지 보류 중)</span></h3>${anaRunHtml()}${markHtml}${normAdminHtml()}${qrHtml}${acctHtml}`);
   return `<div class="card"><h2>촬영 폰</h2>${camHtml()}
-    <p class="hint">촬영 폰의 골고 캠이 켜져 있거나 "골고 연결 대기 중"이면 녹화 시작·정지를 받아요. 쿼터 시작·종료는 로테이션의 킥오프·종료 버튼이 자동으로 보내요.</p></div>
+    <p class="hint">촬영 폰의 골고 캠이 켜져 있거나 "골고 연결 대기 중"이면 녹화 시작·정지를 받아요. 로테이션에서 킥오프를 누르면 녹화가 자동으로 켜지고, 쿼터 종료를 누르면 꺼지면서 쿼터 영상이 만들어져요(골고 캠 0.8.3 이상).</p></div>
   ${a?`<div class="card"><h2>쿼터 영상 링크 · ${dLabel(a.date)}</h2>${qa.map(x=>`<div class="row" style="margin:.3rem 0"><span style="flex:0 0 3.2rem">${x.q}쿼터</span><input data-yt="${esc(x.id)}" value="${esc((x.video&&x.video.yt)||'')}" placeholder="유튜브 링크 붙여넣기"></div>`).join('')}<button class="pri" data-act="saveYt" style="width:100%;margin-top:.4rem">영상 링크 저장</button></div>
   <div class="card"><h2>선수 이름 고치기 · ${a.q}쿼터</h2><p class="hint" style="margin:0 0 .4rem">경기 탭에서 고른 쿼터예요. 추적 번호마다 선수를 지정하면 회원의 나 찾기보다 먼저 적용돼요.</p>
     <ul class="list">${(a.tracks||[]).map(t=>{const o=ownerOf(a,t.tid),s=a.stats&&a.stats[t.tid];return `<li><span style="flex:0 0 5.5rem">${t.team?t.team+'팀 ':''}#${esc(t.tid)}<br><small class="hint">${s?km(s.distM):''}${t.by?' · '+({board:'작전판',claim:'본인',admin:'운영진'}[t.by]||t.by):(!t.pid&&o?' · 본인':'')}</small></span><select data-pid="${esc(t.tid)}"><option value="">(모름)</option>${namesForFix(a).map(n=>`<option value="${esc(n.id)}" ${n.id===o?'selected':''}>${esc(n.name)}</option>`).join('')}</select></li>`}).join('')}</ul>
