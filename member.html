@@ -1181,9 +1181,16 @@ function nameMatchHtml(a,qa){
   if(!ST.crops[a.id])loadCrops(a.id);
   if(!(a.frame&&a.frame.jpg))loadFrame(a.id);
   const N=namesForFix(a);
-  const rows=tr.map(t=>{const o=ownerOf(a,t.tid);let sug=null;
-    if(!o){if(t.suggest&&t.suggest.pid)sug=t.suggest.pid;else if(Array.isArray(t.cands)&&t.cands[0])sug=t.cands[0].pid}
-    return {t,o,sug}}).sort((x,y)=>(!!x.o)-(!!y.o)||String(x.t.team||'').localeCompare(String(y.t.team||'')));
+  // [수정] 2026-11-25 추천은 한 회원을 한 선수에게만: 선수마다 따로 1순위를 붙이면 같은 회원이 여러 선수에게 추천됐다.
+  //   (선수, 회원, 점수) 후보를 모아 점수 높은 짝부터 정하고, 이미 정해진 회원·선수는 건너뛴다.
+  //   후보 점수: 분석기 suggest(같은 날 앞 쿼터 모습)는 +1 을 더해 우선, cands(평소 습관)는 그대로
+  const own={},used=new Set();tr.forEach(t=>{const o=ownerOf(a,t.tid);own[t.tid]=o;if(o)used.add(o)});
+  const pairs=[];tr.forEach(t=>{if(own[t.tid])return;
+    if(t.suggest&&t.suggest.pid)pairs.push({tid:t.tid,pid:t.suggest.pid,sc:(t.suggest.score||0)+1});
+    (Array.isArray(t.cands)?t.cands:[]).forEach(c=>{if(c&&c.pid)pairs.push({tid:t.tid,pid:c.pid,sc:c.score||0})})});
+  const sugOf={};pairs.sort((x,y)=>y.sc-x.sc).forEach(p=>{if(sugOf[p.tid]||used.has(p.pid))return;sugOf[p.tid]=p.pid;used.add(p.pid)});
+  const rows=tr.map(t=>({t,o:own[t.tid],sug:own[t.tid]?null:(sugOf[t.tid]||null)}))
+    .sort((x,y)=>(!!x.o)-(!!y.o)||String(x.t.team||'').localeCompare(String(y.t.team||'')));
   const done=rows.filter(r=>r.o).length,sugN=rows.filter(r=>!r.o&&r.sug).length;
   return `<div class="card"><h2>이름 맞추기 · ${dLabel(a.date)}</h2>${qb}${ourTeamHtml(a,teams)}
     <p class="hint" style="margin:0 0 .5rem">${a.q}쿼터 선수 ${tr.length}명 중 <b>${done}명</b> 맞춤${sugN?` · 추천 ${sugN}명`:''}. 사진을 보고 회원을 고르세요. 같은 날 한 쿼터를 맞추면 다음 쿼터는 <b>추천</b>이 미리 채워져요. 맞으면 저장만 누르면 돼요.</p>
