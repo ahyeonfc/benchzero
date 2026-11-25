@@ -566,6 +566,12 @@ function effPos(t){
   const n=Math.max(base.length,sl(q,t).length);
   return Array.from({length:n},(_,i)=>{const p=base[i]||{x:50,y:45,l:'MF',d:'CM'},o=ov[i];if(!o)return p;const yy=t==='B'?100-o.y:o.y,g=yy>=(scrim()?88:84);const l=g?'GK':labelAt(t,o.y);return{x:o.x,y:o.y,l,d:g?'GK':detailAt(t,o.x,o.y,l),moved:true}});
 }
+// [추가] 20261125, sanghkim, 지금 쿼터 작전판 자리 {mode, A:[{id,x,y,d}], B:[...]}. 상대팀 경기(match)면 B 는 빈 배열
+function boardSig(){
+  const q=S.q[S.cur],o={mode:qm(q)?'scrim':'match',A:[],B:[]};
+  for(const t of teamsOf(q)){const ids=sl(q,t)||[],pos=effPos(t);ids.forEach((id,i)=>{const p=pos[i];if(id&&p)o[t].push({id,x:Math.round(p.x*10)/10,y:Math.round(p.y*10)/10,d:p.d})})}
+  return o;
+}
 const resetPos=q=>{q.pos={A:[],B:[]}};
 function standIn(q,t,k,p){if(!p||!p.pos||p.pos[0]==='GK')return false;const o=q.pos&&q.pos[t]&&q.pos[t][k];if(!o)return k===0;const yy=t==='B'?100-o.y:o.y;return yy>=(qm(q)?88:84)}
 function setPos(t,i,x,y){const q=S.q[S.cur];if(!q.pos)resetPos(q);q.pm=q.mode;q.pos[t][i]={x:Math.round(Math.min(95,Math.max(5,x))*10)/10,y:Math.round(Math.min(96,Math.max(4,y))*10)/10};
@@ -1528,7 +1534,8 @@ function kickoff(){
   q.started=Date.now();q.ended=null;const n=S.cur+1;
   // 출전 명단(lineup): 회원 화면 나 찾기 후보 좁히기용(분석기가 ana.lineup 으로 옮김)
   // onField: 그 쿼터 운동장 위 인원(두 팀 합). 분석기가 영상 속 사람 번호를 이 수에 맞춘다(2026-11-24)
-  camEvt('quarterStart',n,q.started,{lineup:[...(q.slots||[]),...(q.b||[])].filter(Boolean),onField:qsz(q)*2});
+  // [추가] 20261125, sanghkim, board: 작전판 자리(분석기가 선수 위치와 맞춰 이름 추천). x·y 는 작전판 % 좌표 원값(B 도 뒤집지 않음)
+  camEvt('quarterStart',n,q.started,{lineup:[...(q.slots||[]),...(q.b||[])].filter(Boolean),onField:qsz(q)*2,board:boardSig()});
   if(S.cur===S.nq-1)S.nq=Math.min(20,S.nq+1);
   if(S.cur<S.nq-1){S.cur++;sel=null;norm();if(!filled(S.q[S.cur]))autoAll()}
   render();
