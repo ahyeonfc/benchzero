@@ -303,14 +303,21 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 .simbar .phrow{flex:1 1 100%;display:flex;gap:.375rem}.simbar .big{flex:1 1 55%;writing-mode:horizontal-tb;white-space:nowrap}.simbar .ph{flex:1 1 0;min-height:2.4rem;font-weight:700;border-style:dashed}.simbar .ph.busy{opacity:.6}
 .simtop{display:flex;gap:.375rem;margin:0 0 .5rem}.simtop button{flex:1;min-height:2.6rem}
 .board,.board *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}.board textarea{-webkit-user-select:text;user-select:text}#pitch,#tokens .tok{touch-action:none}
-/* [추가] 2026-11-25 회원 화면·출석 화면과 같은 위쪽 탭 줄(출석 · 경기 · 내 카드 · 관리 · 로테이션). 따로 메뉴를 열지 않고 오간다 */
-.gtabs{display:flex;gap:.3rem;overflow-x:auto;background:var(--deep);padding:calc(.5rem + env(safe-area-inset-top)) .75rem .5rem}
-.gtabs a{display:inline-flex;align-items:center;color:#fff;text-decoration:none;border:1px solid #ffffff44;min-height:2.3rem;padding:0 .8rem;border-radius:2rem;font-size:.9rem;font-weight:700;white-space:nowrap}
-.gtabs a.on{background:#fff;color:var(--deep)}
+/* [추가] 2026-11-25 회원 화면·출석 화면과 똑같은 머리(골고 · 이름 · 출석 · 경기 · 내 카드 · 관리 · 로테이션). 따로 메뉴를 열지 않고 오간다.
+   이 화면은 글자 크기 기준(html)이 회원 화면과 달라서 회원 화면의 기준(--u)으로 크기를 직접 잰다.
+   작전판 화면은 화면에 고정(position:fixed)이라 머리 높이(--ghh, 스크립트가 잼)만큼 내려서 시작한다 */
+.ghead{--u:clamp(15px,calc(100vw/26),19px);background:#0f3d2a;color:#fff;padding:calc(.8*var(--u) + env(safe-area-inset-top)) var(--u) calc(.6*var(--u));position:sticky;top:0;z-index:12;font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;line-height:1.5}
+.ghead h1{margin:0;font-size:calc(1.15*var(--u));min-height:calc(1.9*var(--u));display:flex;align-items:center;gap:calc(.5*var(--u));font-weight:700}
+.ghead h1 small{font-size:calc(.8*var(--u));font-weight:500;opacity:.85;margin-left:auto}
+.gtabs{display:flex;gap:calc(.3*var(--u));margin-top:calc(.5*var(--u));overflow-x:auto;scrollbar-width:none}
+.gtabs::-webkit-scrollbar{display:none}
+.gtabs a{display:inline-flex;align-items:center;color:#fff;text-decoration:none;border:1px solid #ffffff44;min-height:calc(2.3*var(--u));padding:0 calc(.8*var(--u));border-radius:calc(2*var(--u));font-size:calc(.9*var(--u));font-weight:700;white-space:nowrap}
+.gtabs a.on{background:#fff;color:#0f3d2a}
+@media(max-width:859px){.view.board{top:var(--ghh,0px)!important}}
 </style>
 </head>
 <body>
-<nav class="gtabs" id="gtabs" aria-label="골고 화면"><a href="checkin.html" data-ci>출석</a><a href="member.html?tab=game">경기</a><a href="member.html?tab=mine">내 카드</a><a href="member.html?tab=admin">관리</a><a class="on" href="#">로테이션</a></nav>
+<header class="ghead" id="ghead"><h1><span>골고</span><small id="gwho"></small></h1><nav class="gtabs" id="gtabs" aria-label="골고 화면"><a href="checkin.html" data-ci>출석</a><a href="member.html?tab=game">경기</a><a href="member.html?tab=mine">내 카드</a><a href="member.html?tab=admin">관리</a><a class="on" href="#">로테이션</a></nav></header>
 <main class="band"><div class="wrap">
 
 <section class="view" data-view="att" id="attBox">
@@ -1297,6 +1304,17 @@ function ciTick(){
   }
   if(S.ciDone.date===today()){const gone=S.ciDone.ids.filter(id=>{const p=S.players.find(x=>x.id===id.slice(id.lastIndexOf('_')+1));return p&&!p.here&&!p.left});if(gone.length){S.ciDone.ids=S.ciDone.ids.filter(id=>!gone.includes(id));S.ciDone.del=[...(S.ciDone.del||[]).filter(x=>x&&x.id),...gone.map(id=>({id,t:Date.now()}))];gone.forEach(id=>F.deleteDoc(F.doc(db,'pub',c.code,'in',id)).catch(()=>{}));save()}}
   const pub={title:'골고',on:!!c.on,radius:+c.radius||300,sched:{home:S.sched.home,weekly:S.sched.weekly,games:S.sched.games.filter(g=>g.date>=today())},events:evList().map(e=>({id:e.id,date:e.date,from:e.from,to:e.to,loc:e.place,opp:e.opp,mode:e.mode})),names:S.players.map(p=>({id:p.id,name:p.name,age:p.age||null}))};
+  // [추가] 2026-11-25 운영진이 여기서 출석시킨 회원도 출석 화면(오늘 도착 순서)에 나오도록 회원 체크인과 같은 기록(pub/{code}/in)을 남긴다.
+  //   ciDone.ids 에 넣어 ciApply 가 다시 적용하지 않게 하고, 출석을 풀면 위(gone)에서 그 기록을 지운다
+  if(S.date===today()&&CI.docs){
+    if(S.ciDone.date!==today())S.ciDone={date:today(),ids:[]};
+    const have=new Set(CI.docs.map(d=>d.pid));
+    S.players.filter(p=>p.here&&!have.has(p.id)).forEach(p=>{
+      const id=(S.evId||today())+'_'+p.id;if(S.ciDone.ids.includes(id))return;
+      S.ciDone.ids.push(id);
+      F.setDoc(F.doc(db,'pub',c.code,'in',id),{pid:p.id,name:p.name,dev:'admin',by:'admin',date:today(),ev:S.evId||'',ts:F.serverTimestamp()}).catch(()=>{S.ciDone.ids=S.ciDone.ids.filter(x=>x!==id)});
+    });
+  }
   const k=JSON.stringify(pub);
   if(k!==CI.lastPub){clearTimeout(CI.pubT);CI.pubT=setTimeout(()=>{F.setDoc(F.doc(db,'pub',c.code),Object.assign(pub,{upd:Date.now()})).then(()=>{CI.lastPub=k}).catch(()=>{})},800)}
   renderCi();
@@ -1594,6 +1612,10 @@ function photoUndo(){const u=PH.undo;if(!u||u.cur!==S.cur)return;const q=S.q[S.c
 $('toFull').addEventListener('click',()=>setSimple(false));
 $('toSimple').addEventListener('click',()=>setSimple(true));
 $('toMember').addEventListener('click',()=>{try{sessionStorage.removeItem('bz-admin')}catch(e){}location.href='member.html'});
+// 머리: 오른쪽 작은 글씨는 회원 화면처럼 내 이름(출석·회원 화면이 기억한 bz-me), 작전판이 머리 아래에서 시작하도록 높이를 잰다
+try{const me=JSON.parse(localStorage.getItem('bz-me')||'null');if(me&&me.name)$('gwho').textContent=me.name+' 님'}catch(e){}
+function ghFit(){document.documentElement.style.setProperty('--ghh',$('ghead').offsetHeight+'px')}
+ghFit();addEventListener('resize',ghFit);try{new ResizeObserver(ghFit).observe($('ghead'))}catch(e){}
 // 위쪽 탭 줄: 출석은 이 축구회의 출석 링크로 연다(코드가 없으면 출석 화면 기본 주소)
 $('gtabs').addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;
   if(a.classList.contains('on')){e.preventDefault();return}
