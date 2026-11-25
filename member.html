@@ -933,7 +933,9 @@ function anaRunHtml(){
 function cmdResultHtml(){
   const c=ST.cam;if(!c)return '';
   const out=[];
-  if(c.camReady===false&&!c.rec)out.push(`<p class="bad" style="margin:.3rem 0 0">촬영 폰 카메라가 꺼져 있어요. 골고 캠 화면을 켜 두세요.</p>`);
+  // 앱 0.7.1~: 골고 캠을 내려놔도 "골고 연결 대기"로 남아 녹화 시작을 받으면 카메라를 켠다(2026-11-25)
+  if(c.standby&&!c.rec)out.push(`<p class="hint" style="margin:.3rem 0 0">촬영 폰: 골고 연결 대기 중(앱이 뒤에 있음). 녹화 시작을 누르면 카메라를 켜고 2~3초 뒤 녹화해요.</p>`);
+  else if(c.camReady===false&&!c.rec)out.push(`<p class="bad" style="margin:.3rem 0 0">촬영 폰 카메라가 꺼져 있어요. 골고 캠 화면을 켜 두세요.</p>`);
   if(c.cmdOp&&c.cmdMs&&Date.now()-c.cmdMs<10*60000){
     const L={start:'녹화 시작',stop:'녹화 정지',quarterStart:'쿼터 시작',quarterEnd:'쿼터 종료',upload:'업로드 설정',lens:'렌즈',position:'촬영 위치',makeQuarter:'쿼터 영상 만들기'};
     const bad=/실패|무시/.test(c.cmdResult||'');
