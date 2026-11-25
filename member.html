@@ -1099,10 +1099,29 @@ async function saveNorm(norm){
 // [추가] 2026-11-25 관리자 "이름 맞추기": 나 찾기는 회원이 아니라 운영진만 한다(다른 사람을 고르는 실수 방지).
 //   선수마다 확대 사진 + 회원 고르기. 아직 정해지지 않은 선수는 분석기 추천(같은 날 앞 쿼터에서 맞춘 사람과 옷이 비슷 = suggest,
 //   평소 자리·움직임 = cands 1순위)을 미리 채워 두고 "추천" 표시. 맞으면 저장만 누르면 된다. 정해지지 않은 선수를 위로
+// [추가] 2026-11-25 상대팀 경기: 운영진이 우리 팀(A/B)을 한 번 고르면 그날 모든 쿼터 문서에 ourTeam 을 적고,
+//   이름 맞추기에는 우리 팀만 나온다(상대 선수 사진·이름은 다루지 않음). 우리끼리 경기면 "둘 다 우리 회원"(ourTeam 없음)
+function oppOf(date){return (ST.P&&ST.P.events||[]).find(e=>e.date===date&&e.opp)||null}
+function ourTeamOf(a){if(a.ourTeam)return a.ourTeam;const o=sortedAna().find(x=>x.date===a.date&&x.ourTeam);return o?o.ourTeam:null}
+function ourTeamHtml(a,teams){
+  if(teams.length<2)return '';
+  const cur=ourTeamOf(a),op=oppOf(a.date);
+  const btn=(v,l)=>`<button data-ourteam="${v}" class="${(cur||'')===v?'on':''}">${l}</button>`;
+  return `<p style="margin:.2rem 0 .3rem;font-weight:700;font-size:.9rem">${op?`상대팀 경기(${esc(op.opp)}) · 우리 팀을 골라 주세요`:'상대팀 경기면 우리 팀을 골라 주세요'}</p>
+    <div class="seg">${btn('','둘 다 우리 회원')}${teams.map(tm=>btn(tm,`<span class="dot" style="background:${teamColor(a,tm)}"></span>${tm}팀이 우리`)).join('')}</div>
+    ${cur?`<p class="hint" style="margin:0 0 .4rem">${cur}팀만 보여요. 상대 선수는 이름 맞추기·기록에서 빠져요. 그날 모든 쿼터에 같이 적용돼요.</p>`:''}`;
+}
+async function saveOurTeam(date,team){
+  await ST.sdkP;const F=ST.F,L=sortedAna().filter(x=>x.date===date);
+  try{await Promise.all(L.map(x=>F.updateDoc(F.doc(ST.db,'pub',ST.conf.code,'ana',x.id),{ourTeam:team||null,updatedMs:Date.now()})));
+    L.forEach(x=>{x.ourTeam=team||null});say(team?`${team}팀을 우리 팀으로 정했어요(${L.length}개 쿼터).`:'두 팀 모두 우리 회원으로 정했어요.','ok')}
+  catch(e){say('저장하지 못했어요.','bad')}
+}
 function nameMatchHtml(a,qa){
-  const tr=a.tracks||[];
-  const qb=`<div class="qs" style="margin:.2rem 0 .5rem">${qa.map(x=>`<button data-sel="${esc(x.id)}" class="${x.id===a.id?'on':''}">${x.q}쿼터${(x.tracks||[]).length&&(x.tracks||[]).every(t=>ownerOf(x,t.tid))?' ✓':''}</button>`).join('')}</div>`;
-  if(!tr.length)return `<div class="card"><h2>이름 맞추기</h2>${qb}<p class="hint">이 쿼터는 아직 선수 분석이 안 됐어요.</p></div>`;
+  const all=a.tracks||[],teams=[...new Set(all.map(t=>t.team).filter(Boolean))].sort(),our=ourTeamOf(a);
+  const tr=our?all.filter(t=>t.team===our):all;
+  const qb=`<div class="qs" style="margin:.2rem 0 .5rem">${qa.map(x=>`<button data-sel="${esc(x.id)}" class="${x.id===a.id?'on':''}">${x.q}쿼터${(()=>{const o=ourTeamOf(x),T=(x.tracks||[]).filter(t=>!o||t.team===o);return T.length&&T.every(t=>ownerOf(x,t.tid))?' ✓':''})()}</button>`).join('')}</div>`;
+  if(!tr.length)return `<div class="card"><h2>이름 맞추기</h2>${qb}${ourTeamHtml(a,teams)}<p class="hint">이 쿼터는 아직 선수 분석이 안 됐어요.</p></div>`;
   if(!ST.crops[a.id])loadCrops(a.id);
   if(!(a.frame&&a.frame.jpg))loadFrame(a.id);
   const N=namesForFix(a);
@@ -1110,7 +1129,7 @@ function nameMatchHtml(a,qa){
     if(!o){if(t.suggest&&t.suggest.pid)sug=t.suggest.pid;else if(Array.isArray(t.cands)&&t.cands[0])sug=t.cands[0].pid}
     return {t,o,sug}}).sort((x,y)=>(!!x.o)-(!!y.o)||String(x.t.team||'').localeCompare(String(y.t.team||'')));
   const done=rows.filter(r=>r.o).length,sugN=rows.filter(r=>!r.o&&r.sug).length;
-  return `<div class="card"><h2>이름 맞추기 · ${dLabel(a.date)}</h2>${qb}
+  return `<div class="card"><h2>이름 맞추기 · ${dLabel(a.date)}</h2>${qb}${ourTeamHtml(a,teams)}
     <p class="hint" style="margin:0 0 .5rem">${a.q}쿼터 선수 ${tr.length}명 중 <b>${done}명</b> 맞춤${sugN?` · 추천 ${sugN}명`:''}. 사진을 보고 회원을 고르세요. 같은 날 한 쿼터를 맞추면 다음 쿼터는 <b>추천</b>이 미리 채워져요. 맞으면 저장만 누르면 돼요.</p>
     <div class="nmlist" style="display:grid;gap:.5rem">${rows.map(({t,o,sug})=>{const v=o||sug||'',s=a.stats&&a.stats[t.tid];
       return `<div class="nmrow">${cropHtml(a,t.tid)}<div style="flex:1;min-width:0"><div class="hint" style="margin:0"><span class="dot" style="background:${teamColor(a,t.team)}"></span>${t.team?t.team+'팀 ':''}#${esc(t.tid)}${s&&s.distM?' · '+km(s.distM):''}${o?' · <b>맞춤</b>':sug?' · <b class="warn">추천</b>':''}</div>
@@ -1233,6 +1252,7 @@ document.addEventListener('click',e=>{
   const p=t.closest('[data-pick]');if(p){const n=(ST.P.names||[]).find(x=>x.id===p.dataset.pick);if(n){ST.confirm=n;ST.msg='';render()}return}
   const sl=t.closest('[data-sel]');if(sl){ST.sel=sl.dataset.sel;ST.msg='';render();return}
   const cd=t.closest('[data-cand]');if(cd){const a=curAna();if(a){ST.pick[a.id]=cd.dataset.cand;ST.msg='';render()}return}
+  const ot=t.closest('[data-ourteam]');if(ot){const a=curAna();if(a)saveOurTeam(a.date,ot.dataset.ourteam).then(render);return}
   const fm=t.closest('[data-fteam]');if(fm){const a=curAna();if(a){ST.fteam[a.id]=fm.dataset.fteam||null;ST.more[a.id]=false;render()}return}
   const ax=t.closest('[data-ax]');if(ax){ST.cardOpen=ST.cardOpen===ax.dataset.ax?null:ax.dataset.ax;render();return}
   const gvb=t.closest('[data-gview]');if(gvb){ST.gview=gvb.dataset.gview;render();return}
@@ -1294,7 +1314,7 @@ async function restQuery(parent,sq){
 const fld=a=>a.map(f=>({fieldPath:f}));
 const eqDate=d=>({fieldFilter:{field:{fieldPath:'date'},op:'EQUAL',value:{stringValue:d}}});
 // 분석 문서에서 받는 칸(첫 장면 사진 frame.jpg 는 빼고 크기만)
-const ANA_LIGHT=['v','date','q','startMs','endMs','source','video','tracks','stats','team','pitch','board','lineup','updatedMs','frame.w','frame.h'];
+const ANA_LIGHT=['v','date','q','startMs','endMs','source','video','tracks','stats','team','pitch','board','lineup','updatedMs','frame.w','frame.h','ourTeam'];   // ourTeam: 상대팀 경기에서 운영진이 고른 우리 팀(2026-11-25)
 const P_CODE=()=>`pub/${ST.conf.code}`;
 // 경기 목록: 날짜·쿼터 번호·시작 시각만
 async function loadIndex(){
