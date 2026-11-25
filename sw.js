@@ -1,5 +1,5 @@
 /* 골고 - 오프라인 캐시 */
-const VER='goalgo-v7';   // 촬영 폰 골고 연결 대기 표시(2026-11-25)
+const VER='goalgo-v9';   // 골고 앱 버튼(쿼터 영상 받기·링크 붙여넣기), 쿼터 영상 받기·지우기(2026-11-25)
 const SHELL=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','checkin.html','member.html','qrcode.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(VER).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==VER).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
