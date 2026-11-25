@@ -313,13 +313,35 @@ function gameHtml(){
     body=reportHtml(s,pitchOf(a),'q'+a.id,{avg:avgOf(myQ.filter(r=>r.a.id!==a.id).map(r=>r.s)),sents:sentences(s,{rows:scopeRows('q',a.id),prev:prevQ&&prevQ.s,prevLabel:prevQ?`앞 쿼터(${prevQ.a.q}쿼터)`:''}),extra:teamHtml(a)})}
   else body=`<p class="hint">이 쿼터에서 아직 내 이름이 맞춰지지 않았어요. 운영진이 맞추면 여기에 내 기록이 나와요.</p>`;
   return `<div class="card">${sel}${qb}${unfH}</div>
-  <div class="card"><h2>${a.q}쿼터 영상 <span class="hint">${a.startMs?hm(a.startMs)+(a.endMs?'~'+hm(a.endMs):''):''}</span></h2>${videoHtml(a)}</div>
+  <div class="card"><h2>${a.q}쿼터 영상 <span class="hint">${a.startMs?hm(a.startMs)+(a.endMs?'~'+hm(a.endMs):''):''}</span></h2>${videoHtml(a)}${myScenesHtml(a)}</div>
   <div class="card"><h2>한눈에 보기</h2>${seg}${body}</div>`;
+}
+// [추가] 2026-11-25 내 장면 바로 보기: 분석기의 10초 칸 속도(speedSeries, 쿼터 시작부터)에서 내가 빠르게 뛴 순간을 골라
+//   쿼터 유튜브 영상의 그 시각(video.offsetSec + 칸×10초, 2초 앞부터)으로 건너뛴다. 내 번호가 여러 개면 칸마다 빠른 쪽
+//   (공 추적이 되면 공 잡은·패스한 장면을 더한다)
+const SCENE_MIN_KMH=14,SCENE_MAX=6,SCENE_GAP_S=30;
+function myScenes(a){
+  const me=ST.me&&ST.me.pid;if(!me)return [];
+  const S=tidsOf(a,me).map(t=>a.stats&&a.stats[t]&&a.stats[t].speedSeries).filter(Array.isArray);if(!S.length)return [];
+  const n=Math.max(...S.map(x=>x.length)),bins=[];
+  for(let i=0;i<n;i++){let v=null;S.forEach(x=>{const y=x[i];if(typeof y==='number'&&(v==null||y>v))v=y});if(v!=null&&v>=SCENE_MIN_KMH)bins.push({i,v})}
+  const pick=[];bins.sort((x,y)=>y.v-x.v).forEach(b=>{if(pick.length<SCENE_MAX&&pick.every(p=>Math.abs(p.i-b.i)*10>=SCENE_GAP_S))pick.push(b)});
+  return pick.sort((x,y)=>x.i-y.i).map(b=>({sec:b.i*10,kmh:b.v,label:b.v>=20?'전력 질주':'빠르게 달림'}));
+}
+function myScenesHtml(a){
+  const L=myScenes(a);if(!L.length)return '';
+  const id=ytId(a.video&&a.video.yt),off=Math.round((a.video&&a.video.offsetSec)||0);
+  const mmss=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  return `<h3 style="margin:.7rem 0 .3rem">내 장면 <span class="hint">빠르게 뛴 순간 ${L.length}개</span></h3>
+    <div style="display:flex;flex-wrap:wrap;gap:.3rem">${L.map(x=>`<button data-seek="${Math.max(0,off+x.sec-2)}" ${id?'':'disabled'} style="flex:1 1 9rem;line-height:1.25;padding:.35rem .5rem">▶ ${mmss(x.sec)} ${x.label}<br><small class="hint">${Math.round(x.kmh)}km/h</small></button>`).join('')}</div>
+    ${id?'':'<p class="hint" style="margin:.3rem 0 0">유튜브 영상이 붙으면 눌러서 그 장면으로 바로 갈 수 있어요.</p>'}`;
 }
 function ytId(u){if(!u)return null;const m=String(u).match(/(?:youtu\.be\/|v=|embed\/|shorts\/|live\/)([\w-]{11})/);return m?m[1]:(/^[\w-]{11}$/.test(u)?u:null)}
 function videoHtml(a){
   const v=a.video||{},id=ytId(v.yt);
-  if(id){const st=Math.max(0,Math.round(v.offsetSec||0));return `<div class="vid"><iframe src="https://www.youtube-nocookie.com/embed/${id}${st?'?start='+st:''}" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="${a.q}쿼터 영상"></iframe></div>`}
+  // 내 장면 버튼을 눌렀으면(ST.seek) 그 시각부터 바로 재생
+  const sk=ST.seek&&ST.seek[a.id];
+  if(id){const st=sk!=null?sk:Math.max(0,Math.round(v.offsetSec||0));const q=[st?'start='+st:'',sk!=null?'autoplay=1':''].filter(Boolean).join('&');return `<div class="vid"><iframe src="https://www.youtube-nocookie.com/embed/${id}${q?'?'+q:''}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="${a.q}쿼터 영상"></iframe></div>`}
   if(v.drive)return `<div class="ready"><p style="margin:0 0 .5rem">유튜브 영상은 아직 준비 중이에요. 드라이브에서 임시로 볼 수 있어요.</p><a href="${esc(v.drive)}" target="_blank" rel="noopener"><button class="pri">드라이브에서 보기</button></a></div>`;
   return `<div class="ready">영상 준비 중이에요. 쿼터 영상이 올라오면 여기서 바로 볼 수 있어요.</div>`;
 }
@@ -1240,6 +1262,8 @@ document.addEventListener('click',e=>{
   if(t.closest('#menuBtn')){ST.menuOpen=!ST.menuOpen;render();return}
   if(ST.menuOpen){const inMenu=t.closest('#menu');ST.menuOpen=false;$('menu').hidden=true;$('menuBtn').setAttribute('aria-expanded','false');if(!inMenu)return}
   const tb=t.closest('[data-tab]');if(tb){ST.tab=tb.dataset.tab;ST.msg='';render();window.scrollTo(0,0);return}
+  // 내 장면: 유튜브 영상을 그 시각부터 다시 연다(다시 그려져도 같은 시각에서 시작하도록 ST.seek 에 기억)
+  const sk=t.closest('[data-seek]');if(sk){const a=curAna();if(a){ST.seek=ST.seek||{};ST.seek[a.id]=+sk.dataset.seek;render();const f=document.querySelector('.vid iframe');if(f)f.scrollIntoView({block:'center',behavior:'smooth'})}return}
   const cv=t.closest('[data-camview]');if(cv){
     if(cv.dataset.camview==='app'){try{MatchCam.event(JSON.stringify({type:'showCamera',ts:Date.now()}))}catch(_){}}
     // 골고 앱(0.8.1~): 같은 폰이면 골고 캠 앱을 연다(촬영 화면이 그대로 보임)
