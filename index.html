@@ -433,15 +433,7 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 <p class="hint">경기 시작을 누르면 자동으로 저장돼요. 날짜를 누르면 그날 기록이 나와요.</p>
 <div id="hcal" class="hcal"></div>
 <div id="hlist" class="hlist"></div>
-<h3 class="sub">회원별 누적</h3>
-<div class="afilt">
-<label><span class="fl">기간</span><select id="hf_range"><option value="all">전체</option><option value="month">달력의 달</option><option value="4">최근 4경기</option><option value="8">최근 8경기</option><option value="12">최근 12경기</option></select></label>
-<label><span class="fl">나이대</span><select id="hf_age"><option value="all">전체</option><option value="20">20대</option><option value="30">30대</option><option value="40">40대</option><option value="50">50대</option><option value="60">60대</option><option value="70">70대</option></select></label>
-<label><span class="fl">구분</span><select id="hf_kind"><option value="all">전체</option><option value="staff">임원</option><option value="mem">회원</option><option value="assoc">준회원</option></select></label>
-<label><span class="fl">정렬</span><select id="hf_sort"><option value="att">출석 많은순</option><option value="play">출전 많은순</option><option value="rest">대기 많은순</option><option value="rate">경기당 대기순</option><option value="streak">최대 연속대기순</option><option value="name">이름순</option></select></label>
-</div>
-<p class="hint" id="hsum"></p>
-<div class="scroll"><table id="htbl"></table></div>
+<!-- [삭제] 2026-11-26 회원별 누적(여러 경기 합계) 표: 로테이션 공평은 한 경기 안의 쿼터만 보므로 뺐다(사용자) -->
 </section>
 
 <section class="view" data-view="set" hidden>
@@ -964,23 +956,12 @@ function histTable(g){
   return `<div class="scroll"><table>${`<thead>${head}</thead><tbody>${rows}</tbody>`}</table></div>`;
 }
 function renderHist(){
-  const H=S.hf||(S.hf={range:'all',age:'all',kind:'all',sort:'att'});
-  ['range','age','kind','sort'].forEach(k=>{$('hf_'+k).value=H[k]});
   // [추가] 2026-11-26 달력: 처음에는 가장 최근 경기의 달·날짜
   if(!hMon)hMon=(S.games[0]?S.games[0].date:today()).slice(0,7);
   if(hDay===null){hDay=S.games[0]?S.games[0].date:'';const G=S.games.filter(g=>g.date===hDay);if(G.length===1)hSel=G[0].gid}
-  const games=H.range==='all'?S.games:H.range==='month'?S.games.filter(g=>g.date.slice(0,7)===hMon):S.games.slice(0,+H.range);
   $('nHist').textContent=`${S.games.length}경기`;
   $('hcal').innerHTML=histCal();
-  const acc=new Map();
-  games.forEach(g=>{const st=recStats(g);g.present.forEach(p=>{const cur=P(p.id)||p;let a=acc.get(p.id);if(!a){a={p:cur,att:0,play:0,rest:0,mx:0};acc.set(p.id,a)}
-    if(p.here||p.left)a.att++;a.play+=st[p.id].play;a.rest+=st[p.id].rest;a.mx=Math.max(a.mx,st[p.id].mx)})});
-  let list=[...acc.values()].filter(a=>(H.age==='all'||a.p.age===+H.age)&&(H.kind==='all'||kindOf(a.p)===H.kind));
-  const rate=a=>a.att?a.rest/a.att:0;
-  const so={att:(a,b)=>b.att-a.att||b.play-a.play,play:(a,b)=>b.play-a.play,rest:(a,b)=>b.rest-a.rest,rate:(a,b)=>rate(b)-rate(a),streak:(a,b)=>b.mx-a.mx||b.rest-a.rest,name:(a,b)=>a.p.name.localeCompare(b.p.name,'ko')};
-  list.sort(so[H.sort]||so.att);
-  $('hsum').textContent=games.length?`${games.length}경기 (${games[games.length-1].date} ~ ${games[0].date}) · ${list.length}명`:'아직 저장된 경기가 없어요. 작전판에서 경기 시작을 누르면 자동으로 저장돼요.';
-  $('htbl').innerHTML=list.length?`<thead><tr><th>이름</th><th>출석</th><th>출전</th><th>대기</th><th>경기당<br>대기</th><th>최대<br>연속대기</th></tr></thead><tbody>${list.map(a=>`<tr><td><span class="dot2${AC(a.p)}"></span>${esc(a.p.name)} <small class="ag">${agL(a.p)}</small></td><td class="num">${a.att}</td><td class="num">${a.play}</td><td class="num">${a.rest}</td><td class="num">${rate(a).toFixed(1)}</td><td class="num ${a.mx>=3?'bad':a.mx>=2?'warn':''}">${a.mx}</td></tr>`).join('')}</tbody>`:'';
+  // [삭제] 2026-11-26 회원별 누적(여러 경기 합계) 계산·표는 뺐다(로테이션 공평은 한 경기 안만 본다)
   // [수정] 2026-11-26 달력에서 고른 날짜의 경기만(그날 경기가 하나면 바로 펼침)
   const dayG=S.games.filter(g=>g.date===hDay);
   $('hlist').innerHTML=!S.games.length?'<p class="empty-note">아직 저장된 경기가 없어요.</p>':!hDay?'':!dayG.length?`<p class="empty-note">${dLabel(hDay)}에는 저장된 경기가 없어요.</p>`:dayG.map(g=>{const st=recStats(g),here=g.present.filter(p=>p.here||p.left).length,mx=Math.max(0,...Object.values(st).map(s=>s.mx)),open=hSel===g.gid;
@@ -1257,7 +1238,7 @@ $('hlist').addEventListener('click',e=>{
     hDelArm=false;const d=dl.dataset.hdel;if(d===S.gid){say('진행 중인 경기 기록이에요. 지우려면 설정에서 "쿼터 기록만 비우기"를 눌러 주세요.');renderHist();return}const gd=(S.games.find(g=>g.gid===d)||{}).date;S.games=S.games.filter(g=>g.gid!==d);hSel=null;
     render();say(`${gd?dLabel(gd)+" ":""}기록을 삭제했어요.`)}
 });
-['range','age','kind','sort'].forEach(k=>$('hf_'+k).addEventListener('change',e=>{S.hf=S.hf||{};S.hf[k]=e.target.value;renderHist();save()}));
+// [삭제] 2026-11-26 회원별 누적 필터(기간·나이대·구분·정렬) 바꾸기
 $('bkCopy').addEventListener('click',()=>{const t=JSON.stringify(S);const box=$('bkBox');
   try{navigator.clipboard.writeText(t).then(()=>say('백업 글을 복사했어요. 카톡 나에게 보내기 등에 붙여 넣어 보관하세요.'),()=>{box.value=t;box.select();say('아래 칸의 글을 길게 눌러 복사해 주세요.')})}catch(err){box.value=t;box.select();say('아래 칸의 글을 길게 눌러 복사해 주세요.')}});
 let bkArm=false;
