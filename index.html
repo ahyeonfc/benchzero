@@ -181,10 +181,15 @@ body.dragging{cursor:grabbing}
   .view.board{position:fixed;left:0;right:0;top:0;bottom:calc(var(--navh) + env(safe-area-inset-bottom));display:flex;flex-direction:column;padding:.5rem .5rem 0}
   .bd-main{flex:1;display:flex;flex-direction:column;min-height:0}
   .pitchwrap{flex:1;display:flex;flex-direction:column;min-height:0}
-  .pitch{flex:1;min-height:12rem}
-  #tray{border-top:1px solid var(--line);margin:0 -.5rem;padding:0 .5rem .4rem;box-shadow:0 -.5rem 1rem -.75rem #0006}
+  .pitch{flex:1;min-height:8rem}
+  #tray{border-top:1px solid var(--line);margin:0 -.5rem;padding:0 .5rem .4rem;box-shadow:0 -.5rem 1rem -.75rem #0006;position:relative;z-index:5}
   .bench{max-height:2.1rem;grid-auto-rows:2.1rem}
   #tray.big .bench{max-height:42vh;grid-auto-rows:auto}
+  /* [수정] 20261126, sanghkim, 펼치면 작전판이 넘쳐 서랍 머리(접기 버튼)를 덮던 문제.
+     펼쳤을 때 남은 높이를 작전판과 벤치가 반씩 나누고 벤치는 그 안에서 스크롤한다(작전판을 보면서 선수를 넣도록) */
+  .pitchwrap{overflow:hidden}
+  .view.board #tray.big{flex:0 1 50%;display:flex;flex-direction:column;min-height:0}
+  .view.board #tray.big .bench{flex:1;min-height:0;max-height:none;overflow:auto}
 }
 /* 넓은 화면: 작전판 + 오른쪽 벤치 */
 @media(min-width:860px){
