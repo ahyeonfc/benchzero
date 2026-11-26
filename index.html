@@ -218,6 +218,18 @@ tr.grp td{background:var(--card);font-weight:700;font-size:.75rem;text-align:lef
 .m.p{background:var(--bib);color:#3a3000}.m.pb{background:var(--bibB);color:#06283a}.m.g{background:var(--gk);color:#3b1600}.m.ks{border:1.5px dashed var(--gk);color:#b45309;font-size:.6rem}
 .m.r{border:1.5px solid var(--mute);color:var(--mute)}.m.x{color:var(--mute);opacity:.6}.m.plan{opacity:.35}
 .hlist{display:grid;gap:.5rem}
+/* [추가] 2026-11-26 기록 달력 */
+.hcal{border:1px solid var(--line);border-radius:.75rem;background:var(--card);padding:.5rem;margin:.25rem 0 .75rem}
+.hcal .hm{display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem}
+.hcal .hm b{font-size:1rem}.hcal .hm button{height:2.25rem;min-width:2.75rem;padding:0 .5rem}
+.hcal .hg{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.hcal .hw{font-size:.75rem;color:var(--mute);padding:.15rem 0}.hcal .hw.sun{color:#c0392b}.hcal .hw.sat{color:#2c6fbb}
+.hcal .hdc{border:0;background:transparent;height:2.6rem;border-radius:.5rem;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.875rem;color:inherit}
+.hcal .hdc.out{visibility:hidden}.hcal .hdc.today{box-shadow:inset 0 0 0 1.5px var(--mute)}
+.hcal .hdc.has{font-weight:800}.hcal .hdc.on{background:var(--deep);color:#fff}
+.hcal .hdc i{display:flex;gap:2px;height:.45rem;margin-top:.1rem}.hcal .hdc i span{width:.4rem;height:.4rem;border-radius:50%;background:#16a34a}
+.hcal .hdc i span.op{background:#ea580c}.hcal .hdc.on i span{box-shadow:0 0 0 1px #fff}
+.hcal .hleg{font-size:.75rem;color:var(--mute);margin:.35rem 0 0}.hcal .hleg span{display:inline-block;width:.5rem;height:.5rem;border-radius:50%;background:#16a34a;margin:0 .2rem 0 .5rem}.hcal .hleg span.op{background:#ea580c}
 .hcard{border:1px solid var(--line);border-radius:.75rem;background:var(--card);padding:.25rem}
 .hcard.open{padding:.25rem .5rem .6rem}
 .hhead{width:100%;display:grid;text-align:left;gap:.1rem;border:0;background:transparent;height:auto;padding:.5rem}
@@ -418,18 +430,18 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 
 <section class="view" data-view="hist" hidden>
 <h2>경기 기록</h2>
-<p class="hint">경기 시작을 누르면 자동으로 저장돼요.</p>
+<p class="hint">경기 시작을 누르면 자동으로 저장돼요. 날짜를 누르면 그날 기록이 나와요.</p>
+<div id="hcal" class="hcal"></div>
+<div id="hlist" class="hlist"></div>
 <h3 class="sub">회원별 누적</h3>
 <div class="afilt">
-<label><span class="fl">기간</span><select id="hf_range"><option value="all">전체</option><option value="4">최근 4경기</option><option value="8">최근 8경기</option><option value="12">최근 12경기</option></select></label>
+<label><span class="fl">기간</span><select id="hf_range"><option value="all">전체</option><option value="month">달력의 달</option><option value="4">최근 4경기</option><option value="8">최근 8경기</option><option value="12">최근 12경기</option></select></label>
 <label><span class="fl">나이대</span><select id="hf_age"><option value="all">전체</option><option value="20">20대</option><option value="30">30대</option><option value="40">40대</option><option value="50">50대</option><option value="60">60대</option><option value="70">70대</option></select></label>
 <label><span class="fl">구분</span><select id="hf_kind"><option value="all">전체</option><option value="staff">임원</option><option value="mem">회원</option><option value="assoc">준회원</option></select></label>
 <label><span class="fl">정렬</span><select id="hf_sort"><option value="att">출석 많은순</option><option value="play">출전 많은순</option><option value="rest">대기 많은순</option><option value="rate">경기당 대기순</option><option value="streak">최대 연속대기순</option><option value="name">이름순</option></select></label>
 </div>
 <p class="hint" id="hsum"></p>
 <div class="scroll"><table id="htbl"></table></div>
-<h3 class="sub">날짜별 기록</h3>
-<div id="hlist" class="hlist"></div>
 </section>
 
 <section class="view" data-view="set" hidden>
@@ -604,7 +616,7 @@ function fit(a,n){a=(a||[]).slice();while(a.length<n)a.push(null);return a}
 const pad=n=>String(n).padStart(2,'0');
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
 const dLabel=s=>{const d=new Date(s+'T00:00');return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]})`};
-let hSel=null,hDelArm=false;
+let hSel=null,hDelArm=false,hMon=null,hDay=null;   // [추가] 2026-11-26 기록 달력: 보는 달(YYYY-MM), 고른 날짜
 function norm(){
   if(S.mode!=='scrim')S.mode='match';
   if(!FORMS[S.size])S.size=11;
@@ -954,8 +966,12 @@ function histTable(g){
 function renderHist(){
   const H=S.hf||(S.hf={range:'all',age:'all',kind:'all',sort:'att'});
   ['range','age','kind','sort'].forEach(k=>{$('hf_'+k).value=H[k]});
-  const games=H.range==='all'?S.games:S.games.slice(0,+H.range);
+  // [추가] 2026-11-26 달력: 처음에는 가장 최근 경기의 달·날짜
+  if(!hMon)hMon=(S.games[0]?S.games[0].date:today()).slice(0,7);
+  if(hDay===null){hDay=S.games[0]?S.games[0].date:'';const G=S.games.filter(g=>g.date===hDay);if(G.length===1)hSel=G[0].gid}
+  const games=H.range==='all'?S.games:H.range==='month'?S.games.filter(g=>g.date.slice(0,7)===hMon):S.games.slice(0,+H.range);
   $('nHist').textContent=`${S.games.length}경기`;
+  $('hcal').innerHTML=histCal();
   const acc=new Map();
   games.forEach(g=>{const st=recStats(g);g.present.forEach(p=>{const cur=P(p.id)||p;let a=acc.get(p.id);if(!a){a={p:cur,att:0,play:0,rest:0,mx:0};acc.set(p.id,a)}
     if(p.here||p.left)a.att++;a.play+=st[p.id].play;a.rest+=st[p.id].rest;a.mx=Math.max(a.mx,st[p.id].mx)})});
@@ -965,9 +981,24 @@ function renderHist(){
   list.sort(so[H.sort]||so.att);
   $('hsum').textContent=games.length?`${games.length}경기 (${games[games.length-1].date} ~ ${games[0].date}) · ${list.length}명`:'아직 저장된 경기가 없어요. 작전판에서 경기 시작을 누르면 자동으로 저장돼요.';
   $('htbl').innerHTML=list.length?`<thead><tr><th>이름</th><th>출석</th><th>출전</th><th>대기</th><th>경기당<br>대기</th><th>최대<br>연속대기</th></tr></thead><tbody>${list.map(a=>`<tr><td><span class="dot2${AC(a.p)}"></span>${esc(a.p.name)} <small class="ag">${agL(a.p)}</small></td><td class="num">${a.att}</td><td class="num">${a.play}</td><td class="num">${a.rest}</td><td class="num">${rate(a).toFixed(1)}</td><td class="num ${a.mx>=3?'bad':a.mx>=2?'warn':''}">${a.mx}</td></tr>`).join('')}</tbody>`:'';
-  $('hlist').innerHTML=S.games.map(g=>{const st=recStats(g),here=g.present.filter(p=>p.here||p.left).length,mx=Math.max(0,...Object.values(st).map(s=>s.mx)),open=hSel===g.gid;
+  // [수정] 2026-11-26 달력에서 고른 날짜의 경기만(그날 경기가 하나면 바로 펼침)
+  const dayG=S.games.filter(g=>g.date===hDay);
+  $('hlist').innerHTML=!S.games.length?'<p class="empty-note">아직 저장된 경기가 없어요.</p>':!hDay?'':!dayG.length?`<p class="empty-note">${dLabel(hDay)}에는 저장된 경기가 없어요.</p>`:dayG.map(g=>{const st=recStats(g),here=g.present.filter(p=>p.here||p.left).length,mx=Math.max(0,...Object.values(st).map(s=>s.mx)),open=hSel===g.gid;
     return `<div class="hcard ${open?'open':''}"><button class="hhead" data-hd="${g.gid}"><b>${dLabel(g.date)}${g.opp?' · vs '+esc(g.opp):''}${g.gid===S.gid?' <span class="now">진행 중</span>':''}</b><small>${(n=>n===g.q.length?'자체전':n?`상대팀 경기 · 자체전 ${n}쿼터`:'상대팀 경기')(g.q.filter(q=>q.mode==='scrim'||(!q.mode&&g.mode==='scrim')).length)} · 출석 ${here}명 · ${g.q.length}쿼터 · 최대 연속 대기 ${mx}회</small></button>
-    ${open?`${histTable(g)}<div class="btns" style="margin-top:10px"><button data-hcopy="${g.gid}">이 날 기록 글로 복사</button><button class="del" data-hdel="${g.gid}">이 날짜 기록 삭제</button></div>`:''}</div>`}).join('')||'<p class="empty-note">아직 저장된 경기가 없어요.</p>';
+    ${open?`${histTable(g)}<div class="btns" style="margin-top:10px"><button data-hcopy="${g.gid}">이 날 기록 글로 복사</button><button class="del" data-hdel="${g.gid}">이 날짜 기록 삭제</button></div>`:''}</div>`}).join('');
+}
+// [추가] 2026-11-26 기록 달력: 월 달력에 경기한 날 점(자체전 초록·상대팀 경기 주황), 누르면 그날 기록
+function histCal(){
+  const [y,m]=hMon.split('-').map(Number),first=new Date(y,m-1,1),n=new Date(y,m,0).getDate(),lead=first.getDay(),td=today();
+  const by={};S.games.forEach(g=>{(by[g.date]=by[g.date]||[]).push(g)});
+  const opp=g=>!g.q.every(q=>q.mode==='scrim'||(!q.mode&&g.mode==='scrim'));
+  const cnt=S.games.filter(g=>g.date.slice(0,7)===hMon).length;
+  let cells='';for(let i=0;i<lead;i++)cells+='<button class="hdc out" tabindex="-1" aria-hidden="true"></button>';
+  for(let d=1;d<=n;d++){const ds=`${y}-${pad(m)}-${pad(d)}`,G=by[ds]||[];
+    cells+=`<button class="hdc${G.length?' has':''}${ds===hDay?' on':''}${ds===td?' today':''}" data-hday="${ds}" aria-label="${dLabel(ds)}${G.length?` 경기 ${G.length}개`:''}">${d}<i>${G.slice(0,3).map(g=>`<span class="${opp(g)?'op':''}"></span>`).join('')}</i></button>`}
+  return `<div class="hm"><button data-hmon="-1" aria-label="이전 달">◀</button><b>${y}년 ${m}월 <small class="ag">· ${cnt}경기</small></b><button data-hmon="1" aria-label="다음 달">▶</button></div>
+  <div class="hg">${'일월화수목금토'.split('').map((w,i)=>`<span class="hw${i===0?' sun':i===6?' sat':''}">${w}</span>`).join('')}${cells}</div>
+  <p class="hleg"><span></span>자체전<span class="op"></span>상대팀 경기</p>`;
 }
 function render(){try{evEnsure()}catch(e){}$('legA').innerHTML=$('legB').innerHTML=LEG;norm();snap();renderHist();renderNav();renderStart();renderTabs();renderAges();renderTeamSw();renderBoard();spread();renderBench();renderTable();renderRoster();renderAtt();renderCtrl();renderSimple();if($('photoMenu')){$('photoMenu').hidden=!photoOK();$('photoMenuCam').hidden=!photoOK()}save();try{if(SY.ref)ciTick()}catch(e){}}
 
@@ -1209,6 +1240,11 @@ $('finishBtn').addEventListener('click',e=>{
   S.q.forEach(q=>{q.slots=emptyFor(q);q.b=emptyFor(q);q.started=null;q.ages=[...AGES];q.agesB=[...AGES];resetPos(q)});S.cur=0;sel=null;
   S.players.forEach(p=>{p.here=false;p.arr=null;p.left=null});S.gid='g'+Date.now();S.nq=9;S.q.length=9;
   render();setView('att');say(`${dLabel(d)} 경기는 기록 탭에 저장했어요. 다음 경기(${dLabel(S.date)}) 준비를 시작하세요.`);
+});
+// [추가] 2026-11-26 기록 달력: 달 넘기기, 날짜 고르기(그날 경기가 하나면 바로 펼침)
+$('hcal').addEventListener('click',e=>{
+  const hmo=e.target.closest('[data-hmon]');if(hmo){const [y,m]=hMon.split('-').map(Number),d=new Date(y,m-1+(+hmo.dataset.hmon),1);hMon=`${d.getFullYear()}-${pad(d.getMonth()+1)}`;renderHist();return}
+  const hdy=e.target.closest('[data-hday]');if(hdy){hDay=hdy.dataset.hday;const G=S.games.filter(g=>g.date===hDay);hSel=G.length===1?G[0].gid:null;renderHist()}
 });
 $('hlist').addEventListener('click',e=>{
   const hd=e.target.closest('[data-hd]');if(hd){hSel=hSel===hd.dataset.hd?null:hd.dataset.hd;renderHist();return}
