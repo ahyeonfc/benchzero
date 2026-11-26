@@ -263,6 +263,7 @@ tr.grp td{background:var(--card);font-weight:700;font-size:.75rem;text-align:lef
 .gaddw>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;min-height:2.5rem;padding:0 .9rem;border-radius:.625rem;border:1px solid #e0bb00;background:var(--bib);color:#2c2500;font-weight:700}.gaddw>summary::-webkit-details-marker{display:none}.gaddw[open]>summary{margin-bottom:.5rem}
 .gadd{display:grid;gap:.4rem;border:1px dashed var(--line);border-radius:.6rem;padding:.6rem}
 #mapM{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex}#mapM[hidden]{display:none!important}.mbox{flex:1;display:flex;flex-direction:column;gap:.4rem;padding:.6rem;min-height:0}.mrow{display:flex;gap:.4rem}.mrow input{flex:1}#mapRes{display:grid;gap:.25rem}#mapRes button{text-align:left;font-size:.8125rem;min-height:2.3rem}.mwrap{position:relative;flex:1;min-height:40vh;border-radius:.75rem;overflow:hidden}#mapEl{position:absolute;inset:0}.mpin{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:500;font-size:2rem;font-weight:800;color:#d92d20;pointer-events:none;text-shadow:0 0 3px #fff}
+.evsel .evrow{display:flex;gap:.4rem;align-items:stretch}.evsel .evrow select{flex:1;min-width:0}.evsel .gend{flex:none;min-height:2.2rem;height:auto;padding:0 .7rem;border-radius:.6rem;font-weight:800;white-space:nowrap}
 .evsel{margin:0 0 .4rem}.evsel select{width:100%;min-height:2.2rem;font-weight:800;border-radius:.6rem;border:1px solid var(--deep);background:var(--deep);color:#fff;padding:0 .6rem}.evsel:empty{display:none}
 .cist{font-weight:700;font-size:.875rem}.cist.on{color:light-dark(#0f6b35,#7ee2a0)}.cist.off{color:var(--mute)}
 
@@ -898,7 +899,10 @@ function evEnsure(){const L=evList();if(!L.length)return;const e=L.find(x=>x.id=
   S.evId='';evLoad(L[0]);norm();
   if(S.work)Object.keys(S.work).forEach(k=>{if(!S.work[k]||S.work[k].date<today())delete S.work[k]})}
 function schedApply(){evEnsure();const e=evCur();if(e&&e.reg&&e.mode!==S.mode&&!S.q.some((q,i)=>counted(i))){S.mode=e.mode;S.q.forEach(q=>{if(!q.started&&!filled(q)&&q.mode!==S.mode){q.mode=S.mode;resetPos(q);q.slots=emptyFor(q);q.b=emptyFor(q)}})}}
-function renderEv(){const L=evList(),h=L.length?`<select data-ev aria-label="경기 선택">${L.map(e=>`<option value="${esc(e.id)}" ${e.id===S.evId?'selected':''}>${esc(evLabel(e))}</option>`).join('')}</select>`:'';document.querySelectorAll('.evsel').forEach(x=>{if(x.dataset.h!==h){x.dataset.h=h;x.innerHTML=h}})}
+function renderEv(){const L=evList();
+  // [추가] 2026-11-26 경기 종료: 쿼터 시작·종료와 다른 경기 단위라 경기 띠 옆에. 1쿼터라도 시작했으면 언제든(두 번 눌러 확정)
+  const ge=S.q.some((x,i)=>counted(i))?`<button class="del gend">${gEndArm?'한 번 더 누르면 종료':'경기 종료'}</button>`:'';
+  const h=(L.length||ge)?`<div class="evrow">${L.length?`<select data-ev aria-label="경기 선택">${L.map(e=>`<option value="${esc(e.id)}" ${e.id===S.evId?'selected':''}>${esc(evLabel(e))}</option>`).join('')}</select>`:'<span style="flex:1"></span>'}${ge}</div>`:'';document.querySelectorAll('.evsel').forEach(x=>{if(x.dataset.h!==h){x.dataset.h=h;x.innerHTML=h}})}
 document.addEventListener('change',e=>{const t=e.target.closest('[data-ev]');if(t)evSwitch(t.value)});
 function renderCtrl(){
   try{renderSched()}catch(e){}
@@ -914,11 +918,12 @@ function renderStart(){
   const q=S.q[S.cur],n=S.cur+1;
   $('startBar').innerHTML=endBtn()+(q.started
     ?`<span class="live">✓ <span class="lg">${n}쿼터 시작 </span>${hm(q.started)}<span class="lg"> · 출전 기록 확정</span></span><button id="unstart">취소</button>${S.cur<S.nq-1?`<button class="dark" id="goNext">${n+1}Q →</button>`:''}`
-    :`<button class="go" id="startBtn">▶ <span class="lg">${n}쿼터 경기 </span>시작</button><span class="hint">말판을 다 놓았으면 눌러 주세요. 출전 기록이 확정되고 ${n+1}쿼터 말판이 자동으로 깔려요.</span>`)
-    // [추가] 2026-11-26 경기 종료: 쿼터를 다 못 하고 끝날 수도 있어서, 1쿼터라도 시작했으면 언제든(두 번 눌러 확정)
-    +(S.q.some((x,i)=>counted(i))?`<button class="del" id="gameEnd">${gEndArm?'한 번 더 누르면 경기 종료':'경기 종료'}</button>`:'');
+    :`<button class="go" id="startBtn">▶ <span class="lg">${n}쿼터 경기 </span>시작</button><span class="hint">말판을 다 놓았으면 눌러 주세요. 출전 기록이 확정되고 ${n+1}쿼터 말판이 자동으로 깔려요.</span>`);
 }
 let gEndArm=false;
+document.addEventListener('click',e=>{if(!e.target.closest('.evsel .gend'))return;
+  if(!gEndArm){gEndArm=true;renderEv();setTimeout(()=>{if(gEndArm){gEndArm=false;renderEv()}},4000);return}
+  gEndArm=false;finishGame()});
 // [추가] 2026-11-26 경기 종료: 진행 중인 쿼터를 끝내고(촬영 녹화도 멈춤) 이 경기 기록을 '종료'로 보관한 뒤 출석·쿼터를 비운다
 function finishGame(){
   const i=liveQ();if(i>=0&&!S.q[i].ended){S.q[i].ended=Date.now();camEvt('quarterEnd',i+1,S.q[i].ended)}
@@ -1161,7 +1166,6 @@ $('startBar').addEventListener('click',e=>{
   const q=S.q[S.cur];
   if(e.target.closest('#startBtn')){kickoff();return}
   if(e.target.closest('[data-qend]')){quarterEnd();return}
-  if(e.target.id==='gameEnd'){if(!gEndArm){gEndArm=true;renderStart();setTimeout(()=>{if(gEndArm){gEndArm=false;renderStart()}},4000);return}gEndArm=false;finishGame();return}
   if(e.target.id==='unstart'){q.started=null;q.ended=null;render();say(`${S.cur+1}쿼터 시작을 취소했어요.`)}
   if(e.target.id==='goNext'){S.cur++;sel=null;render();say('')}
 });
