@@ -120,6 +120,14 @@ details.more{margin-top:.7rem}details.more>summary{cursor:pointer;font-weight:80
 .seg{display:flex;gap:.3rem;margin-bottom:.6rem}.seg button{flex:1;min-height:2.3rem;font-size:.85rem;padding:0 .3rem}.seg button.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 /* [추가] 2026-11-26 운영 화면(index.html) '촬영' 칸 안에 붙여 열 때: 위쪽 머리(제목·탭) 숨김 */
 body.embed header{display:none}
+/* [추가] 2026-11-26 경기 탭: 날짜·쿼터 고르는 칸은 내려도 위에 붙어 있게, 팀 분석·내 기록은 접기 */
+.card.qsel{position:sticky;top:var(--hh,0px);z-index:4;box-shadow:0 4px 10px #0000001a}
+details.card.fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between}
+details.card.fold>summary::-webkit-details-marker{display:none}
+details.card.fold>summary h2{margin:0}
+details.card.fold>summary::after{content:"▾";color:var(--mute);font-size:1.1rem;transition:transform .15s}
+details.card.fold:not([open])>summary::after{transform:rotate(-90deg)}
+details.card.fold[open]>summary{margin-bottom:.6rem}
 </style>
 </head>
 <body>
@@ -319,10 +327,10 @@ function gameHtml(){
   else if(s){const prevQ=myQ.filter(r=>r.a.date===a.date&&r.a.q<a.q).pop();
     body=reportHtml(s,pitchOf(a),'q'+a.id,{avg:avgOf(myQ.filter(r=>r.a.id!==a.id).map(r=>r.s)),sents:sentences(s,{rows:scopeRows('q',a.id),prev:prevQ&&prevQ.s,prevLabel:prevQ?`앞 쿼터(${prevQ.a.q}쿼터)`:''}),extra:teamHtml(a)})}
   else body=`<p class="hint">이 쿼터에서 아직 내 이름이 맞춰지지 않았어요. 운영진이 맞추면 여기에 내 기록이 나와요.</p>`;
-  return `<div class="card">${sel}${qb}${personal?unfH:''}</div>
+  return `<div class="card qsel">${sel}${qb}${personal?unfH:''}</div>
   <div class="card"><h2>${a.q}쿼터 영상 <span class="hint">${a.startMs?hm(a.startMs)+(a.endMs?'~'+hm(a.endMs):''):''}</span></h2>${videoHtml(a)}${personal?myScenesHtml(a):''}</div>
   ${teamCardHtml(a)}
-  ${personal?`<div class="card"><h2>내 기록</h2>${seg}${body}</div>`:''}`;
+  ${personal?foldCard('me','내 기록',seg+body):''}`;
 }
 // 개인 기록을 보여 줄지. 2026-11-25 정확도 확인 전까지 운영진만 → 2026-11-26 회원에게 다시 연다(뛴 거리 등 내 기록, 사용자 요청).
 // 다시 닫으려면 여기를 !!(ST.admin||ST.linkAdmin) 로
@@ -485,7 +493,9 @@ const REF=' <em class="ref">참고</em>';
 const KPI_HELP='<p class="hint">고속 거리: 시속 20km 이상으로 뛴 거리 · 전력 질주 거리: 시속 25km 이상 · 스프린트: 시속 25km 이상이 1초 이상 이어진 횟수 · <em class="ref">참고</em> 표시는 카메라 영상으로 잰 순간 값이라 오차가 있을 수 있어요.</p>';
 const ZC={walk:'#94a3b8',jog:'#4ade80',run:'#f59e0b',sprint:'#dc2626'},ZN={walk:'걷기',jog:'조깅',run:'달리기',sprint:'고속'};
 const mmss=sec=>`${Math.floor(sec/60)}:${pad(Math.round(sec%60))}`;
-const pitchOf=a=>{const P=(a&&a.pitch)||{};return{w:P.w||100,h:P.h||64}};
+// [수정] 2026-11-26 운동장 보정이 안 된 쿼터(pitch.calibrated===false)는 좌표가 화면 비율(0~1)이라 1×1 로 그리고 거리·모양 숫자는 안 보인다
+const pitchOf=a=>{const P=(a&&a.pitch)||{};if(P.calibrated===false)return{w:1,h:1,uncal:true};return{w:P.w||100,h:P.h||64}};
+const pAsp=P=>P.uncal?0.64:P.h/P.w;
 // 작전판 자리(없으면 평균 위치)로 수비·미드·공격을 나눈다. 오른쪽이 공격 방향
 function posGroup(s,P){const p=s&&(s.board||s.avg);if(!p)return null;const x=p[0]/P.w;return x<0.38?'DF':x<0.66?'MF':'FW'}
 const PGN={DF:'수비',MF:'미드',FW:'공격'};
@@ -539,7 +549,7 @@ function pitchLines(W,H){const c='#ffffffaa',w=1.5;return `<rect width="${W}" he
 function toPath(p){if(!p)return [];if(Array.isArray(p)&&Array.isArray(p[0]))return p;const f=Array.isArray(p)?p:Array.isArray(p.p)?p.p:[];const o=[];for(let i=0;i+1<f.length;i+=2)o.push([f[i],f[i+1]]);return o}
 function sprintSvg(s,P){
   const L=(s.sprintPaths||[]).map(toPath).filter(p=>p.length>=2);if(!L.length)return '';
-  const W=320,H=Math.round(W*P.h/P.w),X=v=>(v/P.w*W).toFixed(1),Y=v=>(v/P.h*H).toFixed(1);
+  const W=320,H=Math.round(W*pAsp(P)),X=v=>(v/P.w*W).toFixed(1),Y=v=>(v/P.h*H).toFixed(1);
   let g=pitchLines(W,H);
   L.forEach(p=>{g+=`<polyline points="${p.map(q=>X(q[0])+','+Y(q[1])).join(' ')}" fill="none" stroke="#facc15" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#bzArr)"/><circle cx="${X(p[0][0])}" cy="${Y(p[0][1])}" r="2.6" fill="#fff"/>`});
   return `<h3>스프린트 경로 · ${L.length}회</h3><svg viewBox="0 0 ${W} ${H}" style="width:100%;border-radius:.6rem"><defs><marker id="bzArr" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto"><path d="M0,0L10,5L0,10z" fill="#facc15"/></marker></defs>${g}</svg><p class="hint">흰 점에서 출발해 화살표 쪽으로 달렸어요. 오른쪽이 공격 방향이에요.</p>`;
@@ -564,12 +574,13 @@ function vsAvg(v,av,fmt,unit){if(!nz(v)||!nz(av)||!av)return '';const d=v-av;if(
 const sec=(desc,html)=>html?html.replace('</h3>',`</h3><p class="hint sd">${desc}</p>`):'';
 function reportHtml(s,P,key,ctx){
   (ST.rep=ST.rep||{})[key]={s,P};ctx=ctx||{};const av=ctx.avg||{};
-  const big=`<div class="glance">
+  // [수정] 2026-11-26 운동장 보정 전이면 뛴 거리·속도·스프린트를 못 재므로 '-' 세 칸 대신 안내
+  const big=P.uncal?'<p class="msg warn" style="font-size:.9rem">이 쿼터는 운동장 보정 전이라 뛴 거리·속도·스프린트는 아직 못 재요. 히트맵은 촬영 화면 기준이라 위치가 대략이에요.</p>':`<div class="glance">
     <div><b>${km(s.distM)}</b><span>뛴 거리</span>${vsAvg(s.distM,av.distM,km)}</div>
     <div><b>${nz(s.vmaxKmh)?s.vmaxKmh.toFixed(1):'-'}</b><span>최고 속도 km/h${REF}</span>${vsAvg(s.vmaxKmh,av.vmaxKmh,v=>v.toFixed(1))}</div>
     <div><b>${nz(s.sprints)?s.sprints+'회':'-'}</b><span>스프린트(전력 질주)</span>${vsAvg(s.sprints,av.sprints,v=>v.toFixed(1),'회')}</div></div>`;
   const S=(ctx.sents||[]).filter(Boolean);
-  const heat=s.heat||s.avg?`<canvas class="pitch" data-rep="${esc(key)}" width="600" height="${Math.round(600*P.h/P.w)}"></canvas>
+  const heat=s.heat||s.avg?`<canvas class="pitch" data-rep="${esc(key)}" width="600" height="${Math.round(600*pAsp(P))}"></canvas>
     <p class="hint" style="margin:.2rem 0 0">많이 있던 곳일수록 빨갛고, 노란 점이 내 평균 위치예요.${s.board?' 흰 점은 작전판 자리.':''} 오른쪽이 공격 방향.</p>`:'';
   const more=sec('이 경기 기록을 숫자로 모두 보여 줘요.','<h3>모든 숫자</h3>'+kpiHtml(s))+
     sec('시간에 따라 얼마나 빨리 뛰었는지 보여 줘요.',speedSvg(s))+
@@ -617,16 +628,23 @@ function teamCardHtml(a){
     const heat=new Array(96).fill(0);S.forEach(s=>(s.heat||[]).forEach((v,i)=>{heat[i]+=v||0}));const mx=Math.max(...heat)||1;
     const key='team'+a.id+tm;ST.rep[key]={s:{heat:heat.map(v=>v/mx),dots:S.map(s=>s.avg).filter(p=>Array.isArray(p))},P};
     const sum=f=>S.reduce((x,s)=>x+(nz(f(s))?f(s):0),0),dist=sum(s=>s.distM),spr=sum(s=>s.sprints),t=T[tm]||{};
-    const kpi=[[dist?km(dist):'-','팀 뛴 거리'],[dist?km(dist/n):'-','1인 평균'],[spr?Math.round(spr):'-','스프린트 합'],
+    // [수정] 2026-11-26 1인 평균은 사람 수가 아니라 번호 조각 수로 나눠 틀려서 뺐고, 'N명'(조각 수)도 뺐다.
+    //   운동장 보정 전(P.uncal)이면 거리·모양 숫자는 화면 비율이라 쓰지 않는다
+    const kpi=P.uncal?[]:[[dist?km(dist):'-','팀 뛴 거리'],[spr?Math.round(spr):'-','스프린트 합'],
       [nz(t.lineYm)?t.lineYm.toFixed(1)+'m':'-','수비 라인 높이'],[nz(t.widthM)?t.widthM.toFixed(1)+'m':'-','팀 폭'],[nz(t.lengthM)?t.lengthM.toFixed(1)+'m':'-','팀 길이']];
-    return `<h3 style="margin:.6rem 0 .3rem"><span class="dot" style="background:${teamColor(a,tm)}"></span>${tm}팀 <span class="hint">${n}명</span></h3>
-      <div class="kpi">${kpi.map(([v,l])=>`<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>
-      <canvas class="pitch" data-rep="${esc(key)}" width="600" height="${Math.round(600*P.h/P.w)}" style="margin-top:.4rem"></canvas>`;
+    return `<h3 style="margin:.6rem 0 .3rem"><span class="dot" style="background:${teamColor(a,tm)}"></span>${tm}팀</h3>
+      ${kpi.length?`<div class="kpi">${kpi.map(([v,l])=>`<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>`:''}
+      <canvas class="pitch" data-rep="${esc(key)}" width="600" height="${Math.round(600*pAsp(P))}" style="margin-top:.4rem"></canvas>`;
   }).join('');
   if(!blocks)return '';
-  return `<div class="card"><h2>팀 분석 · ${a.q}쿼터</h2>${blocks}
-    <p class="hint" style="margin:.4rem 0 0">왼쪽이 우리 골대, 오른쪽이 공격 방향이에요. 색이 진할수록 팀이 많이 뛴 곳, 흰 점은 선수별 평균 위치예요. 수비 라인 높이는 우리 골대에서 수비 라인까지, 팀 길이는 맨 앞과 맨 뒤 선수 사이 거리예요(짧을수록 촘촘).</p></div>`;
+  const unc=P.uncal?'<p class="msg warn" style="font-size:.9rem;margin:.2rem 0 .4rem">이 쿼터는 운동장 보정 전이라 거리·속도·팀 모양은 아직 못 재요. 히트맵은 촬영 화면 기준이라 위치가 대략이에요.</p>':'';
+  return foldCard('team',`팀 분석 · ${a.q}쿼터`,`${unc}${blocks}
+    <p class="hint" style="margin:.4rem 0 0">왼쪽이 우리 골대, 오른쪽이 공격 방향이에요. 색이 진할수록 팀이 많이 뛴 곳, 흰 점은 선수별 평균 위치예요.${P.uncal?'':' 수비 라인 높이는 우리 골대에서 수비 라인까지, 팀 길이는 맨 앞과 맨 뒤 선수 사이 거리예요(짧을수록 촘촘).'}</p>`);
 }
+// [추가] 2026-11-26 접을 수 있는 카드(팀 분석·내 기록). 접은 상태는 이 폰에 기억
+function foldOpen(k){try{const o=JSON.parse(localStorage.getItem('gg-fold')||'{}');return o[k]!==false}catch(e){return true}}
+function foldCard(k,title,body){return `<details class="card fold" data-fold="${k}" ${foldOpen(k)?'open':''}><summary><h2>${title}</h2></summary>${body}</details>`}
+document.addEventListener('toggle',e=>{const d=e.target;if(!d||!d.dataset||!d.dataset.fold)return;try{const o=JSON.parse(localStorage.getItem('gg-fold')||'{}');o[d.dataset.fold]=d.open;localStorage.setItem('gg-fold',JSON.stringify(o))}catch(err){}if(d.open)setTimeout(()=>{try{afterRender()}catch(err){}},0)},true);
 function teamHtml(a){const T=a.team||{},ks=Object.keys(T).sort();if(!ks.length)return '';
   return `<h3>팀 모양</h3><p class="hint sd">우리 팀 전체 모양이에요. 수비 라인(우리 골대에서 수비 라인까지 거리), 폭, 길이(맨 앞과 맨 뒤 선수 사이).</p><table><tr><th>팀</th><th>수비 라인</th><th>폭</th><th>길이</th><th>팀 거리</th></tr>${ks.map(k=>{const t=T[k];return `<tr><td>${esc(k)}팀</td><td>${nz(t.lineYm)?t.lineYm.toFixed(1)+'m':'-'}</td><td>${nz(t.widthM)?t.widthM.toFixed(1)+'m':'-'}</td><td>${nz(t.lengthM)?t.lengthM.toFixed(1)+'m':'-'}</td><td>${km(t.distM)}</td></tr>`}).join('')}</table>`}
 
@@ -1230,6 +1248,9 @@ function adminHtml(){
   <div class="card">${moreHtml}</div>`;
 }
 function afterRender(){
+  // [추가] 2026-11-26 날짜·쿼터 칸이 머리 바로 아래 붙도록 머리 높이를 기억(운영 화면 안에 붙여 열면 머리가 없어 0)
+  try{const h=document.querySelector('header'),set=()=>document.documentElement.style.setProperty('--hh',(h&&getComputedStyle(h).display!=='none'?h.offsetHeight:0)+'px');set();
+    if(h&&!ST.hhObs&&'ResizeObserver' in window){ST.hhObs=new ResizeObserver(set);ST.hhObs.observe(h)}}catch(e){}
   // 나 찾기 칸이 화면에 들어오면 그 쿼터 선수 사진을 받는다
   const fc=$('findCard'),ca=curAna();if(ST.cropObs)ST.cropObs.disconnect();
   if(fc&&ca&&!ST.crops[ca.id]&&'IntersectionObserver' in window){ST.cropObs=new IntersectionObserver(es=>{if(es.some(x=>x.isIntersecting)){ST.cropObs.disconnect();loadCrops(ca.id)}},{rootMargin:'200px'});ST.cropObs.observe(fc)}
