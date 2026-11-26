@@ -318,10 +318,11 @@ function gameHtml(){
   return `<div class="card">${sel}${qb}${personal?unfH:''}</div>
   <div class="card"><h2>${a.q}쿼터 영상 <span class="hint">${a.startMs?hm(a.startMs)+(a.endMs?'~'+hm(a.endMs):''):''}</span></h2>${videoHtml(a)}${personal?myScenesHtml(a):''}</div>
   ${teamCardHtml(a)}
-  ${personal?`<div class="card"><h2>내 기록 <span class="hint">운영진 확인용 · 회원에게는 아직 안 보여요</span></h2>${seg}${body}</div>`:''}`;
+  ${personal?`<div class="card"><h2>내 기록</h2>${seg}${body}</div>`:''}`;
 }
-// 개인 기록을 보여 줄지: 지금은 운영진 기기에서만(정확도 확인용). 회원에게 열 때 여기만 바꾼다
-function personalOn(){return !!(ST.admin||ST.linkAdmin)}
+// 개인 기록을 보여 줄지. 2026-11-25 정확도 확인 전까지 운영진만 → 2026-11-26 회원에게 다시 연다(뛴 거리 등 내 기록, 사용자 요청).
+// 다시 닫으려면 여기를 !!(ST.admin||ST.linkAdmin) 로
+function personalOn(){return true}
 // [추가] 2026-11-25 내 장면 바로 보기: 분석기의 10초 칸 속도(speedSeries, 쿼터 시작부터)에서 내가 빠르게 뛴 순간을 골라
 //   쿼터 유튜브 영상의 그 시각(video.offsetSec + 칸×10초, 2초 앞부터)으로 건너뛴다. 내 번호가 여러 개면 칸마다 빠른 쪽
 //   (공 추적이 되면 공 잡은·패스한 장면을 더한다)
