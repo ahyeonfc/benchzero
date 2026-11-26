@@ -925,14 +925,27 @@ document.addEventListener('click',e=>{if(!e.target.closest('.evsel .gend'))retur
   if(!gEndArm){gEndArm=true;renderEv();setTimeout(()=>{if(gEndArm){gEndArm=false;renderEv()}},4000);return}
   gEndArm=false;finishGame()});
 // [추가] 2026-11-26 경기 종료: 진행 중인 쿼터를 끝내고(촬영 녹화도 멈춤) 이 경기 기록을 '종료'로 보관한 뒤 출석·쿼터를 비운다
-function finishGame(){
+function finishGame(auto){
   const i=liveQ();if(i>=0&&!S.q[i].ended){S.q[i].ended=Date.now();camEvt('quarterEnd',i+1,S.q[i].ended)}
-  snap();const d=S.date,rec=S.games.find(g=>g.gid===S.gid);if(rec)rec.ended=Date.now();
+  snap();const d=S.date,rec=S.games.find(g=>g.gid===S.gid);if(rec){rec.ended=Date.now();if(auto)rec.autoEnd=true}
   S.q.forEach(q=>{q.slots=emptyFor(q);q.b=emptyFor(q);q.started=null;q.ended=null;q.ages=[...AGES];q.agesB=[...AGES];resetPos(q)});S.cur=0;sel=null;
   S.players.forEach(p=>{p.here=false;p.arr=null;p.left=null});S.gid='g'+Date.now();S.nq=9;S.q.length=9;
   hDay=d;hMon=d.slice(0,7);hSel=rec?rec.gid:null;
-  render();say(`${dLabel(d)} 경기를 끝냈어요. 기록 탭에 보관했어요.`);
+  render();say(auto?`${dLabel(d)} 경기가 끝나는 시각이 지나 자동으로 끝냈어요. 기록 탭에 보관했어요.`:`${dLabel(d)} 경기를 끝냈어요. 기록 탭에 보관했어요.`);
 }
+// [추가] 2026-11-26 자동 경기 종료: 쿼터를 시작한 경기인데 일정의 끝나는 시각 + 30분이 지났으면(일정이 없으면 그날 자정) 경기 종료를 대신 누른다.
+// 화면을 열 때와 1분마다 본다(운영진 폰에서 골고를 열어 둔 동안)
+const AUTO_END_MIN=30;
+function autoEnd(){
+  if(!S.q.some((q,i)=>counted(i)))return false;
+  const e=evCur(),endAt=e&&e.to&&e.date===S.date?Date.parse(`${e.date}T${e.to}`)+AUTO_END_MIN*60000:Date.parse(`${S.date}T23:59:59`);
+  if(!(Date.now()>endAt))return false;
+  // 예정보다 길어진 경기를 도중에 끊지 않게: 마지막 쿼터 시작·종료 뒤 40분 동안 움직임이 없을 때만
+  const last=Math.max(0,...S.q.map(q=>Math.max(q.started||0,q.ended||0)));
+  if(Date.now()-last<40*60000)return false;
+  finishGame(true);return true;
+}
+setInterval(()=>{try{autoEnd()}catch(e){}},60000);
 // [MatchCam 연동] 진행 중인 쿼터(마지막으로 시작한 쿼터) 종료 버튼
 function liveQ(){let live=-1;S.q.forEach((x,i)=>{if(x.started)live=i});return live}
 function endBtn(){const i=liveQ();if(i<0||S.q[i].ended)return '';return `<button class="dark" data-qend="${i}">⏹ ${i+1}쿼터 종료</button>`}
@@ -982,7 +995,7 @@ function renderHist(){
   // [수정] 2026-11-26 달력에서 고른 날짜의 경기만(그날 경기가 하나면 바로 펼침)
   const dayG=S.games.filter(g=>g.date===hDay);
   $('hlist').innerHTML=!S.games.length?'<p class="empty-note">아직 저장된 경기가 없어요.</p>':!hDay?'':!dayG.length?`<p class="empty-note">${dLabel(hDay)}에는 저장된 경기가 없어요.</p>`:dayG.map(g=>{const st=recStats(g),here=g.present.filter(p=>p.here||p.left).length,mx=Math.max(0,...Object.values(st).map(s=>s.mx)),open=hSel===g.gid;
-    return `<div class="hcard ${open?'open':''}"><button class="hhead" data-hd="${g.gid}"><b>${dLabel(g.date)}${g.opp?' · vs '+esc(g.opp):''}${g.gid===S.gid?' <span class="now">진행 중</span>':''}</b><small>${(n=>n===g.q.length?'자체전':n?`상대팀 경기 · 자체전 ${n}쿼터`:'상대팀 경기')(g.q.filter(q=>q.mode==='scrim'||(!q.mode&&g.mode==='scrim')).length)} · 출석 ${here}명 · ${g.q.length}쿼터 · 최대 연속 대기 ${mx}회${g.ended?` · ${hm(g.ended)} 종료`:''}</small></button>
+    return `<div class="hcard ${open?'open':''}"><button class="hhead" data-hd="${g.gid}"><b>${dLabel(g.date)}${g.opp?' · vs '+esc(g.opp):''}${g.gid===S.gid?' <span class="now">진행 중</span>':''}</b><small>${(n=>n===g.q.length?'자체전':n?`상대팀 경기 · 자체전 ${n}쿼터`:'상대팀 경기')(g.q.filter(q=>q.mode==='scrim'||(!q.mode&&g.mode==='scrim')).length)} · 출석 ${here}명 · ${g.q.length}쿼터 · 최대 연속 대기 ${mx}회${g.ended?` · ${hm(g.ended)} ${g.autoEnd?'자동 종료':'종료'}`:''}</small></button>
     ${open?`${histTable(g)}<div class="btns" style="margin-top:10px"><button data-hcopy="${g.gid}">이 날 기록 글로 복사</button><button class="del" data-hdel="${g.gid}">이 날짜 기록 삭제</button></div>`:''}</div>`}).join('');
 }
 // [추가] 2026-11-26 기록 달력: 월 달력에 경기한 날 점(자체전 초록·상대팀 경기 주황), 누르면 그날 기록
@@ -1270,7 +1283,8 @@ $('resetBtn').addEventListener('click',e=>{
   resetArm=false;e.target.textContent='쿼터 기록만 비우기 (출석 유지)';
   S.q.forEach(q=>{q.slots=emptyFor(q);q.b=emptyFor(q);q.started=null});S.cur=0;sel=null;render();say('새 경기를 시작했어요. 나이대 제한 쿼터가 있으면 먼저 설정하고, 1쿼터 자동 편성을 눌러 주세요.');
 });
-norm();if(S.date<today()&&!S.q.some((q,i)=>counted(i)))S.date=today();try{evEnsure()}catch(e){}
+norm();try{autoEnd()}catch(e){}   // [추가] 2026-11-26 끝나는 시각이 지난 경기는 열 때 자동 종료
+if(S.date<today()&&!S.q.some((q,i)=>counted(i)))S.date=today();try{evEnsure()}catch(e){}
 /* ---- 서버 저장 (Firebase Firestore, 무료 요금제) ---- */
 const FBV='13.4.0';
 const DEF_CFG={"apiKey":"AIzaSyDvJZfjmVWOMXzNAgYciQC80qDx8n3iP6E","authDomain":"benchzero-50f14.firebaseapp.com","projectId":"benchzero-50f14","storageBucket":"benchzero-50f14.firebasestorage.app","messagingSenderId":"279178405228","appId":"1:279178405228:web:11cefb680a5a1c85837f49"};
