@@ -118,9 +118,12 @@ details.more{margin-top:.7rem}details.more>summary{cursor:pointer;font-weight:80
 .nt{font-size:.8rem}.nt th,.nt td{padding:.3rem .25rem;text-align:center}.nt small{color:var(--mute);font-weight:400}
 .axh summary{cursor:pointer;color:var(--mute);font-size:.85rem}
 .seg{display:flex;gap:.3rem;margin-bottom:.6rem}.seg button{flex:1;min-height:2.3rem;font-size:.85rem;padding:0 .3rem}.seg button.on{background:var(--deep);color:#fff;border-color:var(--deep)}
+/* [추가] 2026-11-26 운영 화면(index.html) '촬영' 칸 안에 붙여 열 때: 위쪽 머리(제목·탭) 숨김 */
+body.embed header{display:none}
 </style>
 </head>
 <body>
+<script>if(/[?&]embed=1\b/.test(location.search))document.body.classList.add('embed')</script>
 <header><h1><span id="title">골고</span><small id="who"></small><button id="menuBtn" class="mbtn" aria-label="메뉴" aria-haspopup="true" aria-expanded="false">⋯</button></h1><div id="menu" class="hmenu" role="menu" hidden></div><div class="tabs" id="tabs"></div></header>
 <main><div id="app"><p class="ld">불러오는 중…</p></div></main>
 <script src="qrcode.js"></script>
@@ -226,10 +229,11 @@ function allRows(){const out=[];sortedAna().forEach(a=>{const seen=new Set();(a.
 function tabsHtml(){
   // [수정] 2026-11-25 운영진 기기에는 관리 탭을 늘 보여 주고, 기존 연결 링크 기기에는 로테이션(작전판) 탭도 둔다
   const staff=ST.admin||ST.linkAdmin;
-  const T=[['game','경기'],['mine','내 카드']];if(SHOW_RANK)T.push(['rank','순위']);if(staff)T.push(['admin','관리']);
+  // [수정] 2026-11-26 관리·로테이션을 '운영' 하나로: 운영 화면(index.html)의 아래쪽 '촬영' 칸이 관리 화면
+  const T=[['game','경기'],['mine','내 카드']];if(SHOW_RANK)T.push(['rank','순위']);
   // 출석은 따로 있는 출석 화면(checkin.html)으로 간다. 홈 화면 아이콘이 회원 화면으로 열려서 입구를 맨 앞에 둔다(2026-11-23)
   return (ST.test?'':`<button data-act="checkin">출석</button>`)+T.map(([k,l])=>`<button data-tab="${k}" class="${ST.tab===k?'on':''}">${l}</button>`).join('')+
-    (ST.linkAdmin?`<button data-act="oldAdmin">로테이션</button>`:'');
+    (staff?`<button data-act="ops">운영</button>`:'');
 }
 // 출석 화면 주소: 출석 링크(ciLink)와 같은 형식. 기본 프로젝트면 #ci-코드, 아니면 #c=설정+코드
 function checkinHref(){
@@ -1361,6 +1365,8 @@ document.addEventListener('click',e=>{
   else if(k==='pasteLinkPrompt'){const v=(prompt('카톡 등으로 받은 골고 링크를 붙여넣으세요\n(출석 링크·회원 링크·운영진 연결 링크)')||'').trim();if(!v)return;if(!/^https:\/\/ahyeonfc\.github\.io\/goalgo\//.test(v)){say('골고 링크가 아니에요. https://ahyeonfc.github.io/goalgo/ 로 시작하는 링크를 붙여넣어 주세요.','bad');return}location.href=v;setTimeout(()=>location.reload(),300)}
   else if(k==='login')login();else if(k==='logout'){ST.A&&ST.A.signOut(ST.auth)}
   else if(k==='oldAdmin'){try{sessionStorage.setItem('bz-admin','1')}catch(err){}location.href='index.html'}
+  // [추가] 2026-11-26 운영: 연결 링크 운영진은 작전판 화면, 구글 로그인만 한 운영진은 바로 촬영·관리 칸
+  else if(k==='ops'){try{sessionStorage.setItem('bz-admin','1')}catch(err){}location.href=ST.linkAdmin?'index.html':'index.html?v=cam'}
   // 골고 앱: 받은 링크로 열기(주소 뒤 #ci-… 만 다르면 페이지가 다시 열리지 않아 새로 고친다)
   else if(k==='pasteLink'){const v=(($('pasteLink')||{}).value||'').trim();if(!/^https:\/\/ahyeonfc\.github\.io\/goalgo\//.test(v)){say('골고 링크가 아니에요. https://ahyeonfc.github.io/goalgo/ 로 시작하는 링크를 붙여넣어 주세요.','bad');return}location.href=v;setTimeout(()=>location.reload(),300)}
   else if(k==='mark')addMark();else if(k==='saveYt')saveYt();else if(k==='savePid')savePid();

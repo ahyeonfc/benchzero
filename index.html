@@ -271,7 +271,7 @@ tr.grp td{background:var(--card);font-weight:700;font-size:.75rem;text-align:lef
 .toast{position:fixed;left:50%;top:calc(.5rem + env(safe-area-inset-top));transform:translate(-50%,-1rem);width:min(92vw,560px);margin:0;padding:.6rem .85rem;border-radius:.75rem;background:#13201a;color:#fff;font-size:.8125rem;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;box-shadow:0 .5rem 1.5rem #0004}
 .toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 @media(prefers-reduced-motion:reduce){.toast{transition:none}}
-.nav{position:fixed;left:0;right:0;bottom:0;z-index:10;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));background:var(--deep);padding:.3rem .3rem calc(.3rem + env(safe-area-inset-bottom));gap:.25rem;height:calc(var(--navh) + env(safe-area-inset-bottom))}
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:10;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));background:var(--deep);padding:.3rem .3rem calc(.3rem + env(safe-area-inset-bottom));gap:.25rem;height:calc(var(--navh) + env(safe-area-inset-bottom))}
 .nav button{background:transparent;border:0;color:#cfe6d6;display:grid;align-content:center;gap:0;min-height:0;border-radius:.6rem;padding:0 .2rem;line-height:1.2}
 .nav button b{font-size:.9375rem}.nav button small{font-size:.6875rem;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nav button.on{background:#ffffff1f;color:#fff}.nav button.on b{color:var(--bib)}
@@ -306,7 +306,7 @@ td,th{padding:.3rem .35rem}
 /* ---- 간편 모드 ---- */
 body:not(.simple) .sim{display:none!important}
 body.simple .qtools,body.simple #startBar,body.simple .legbox,body.simple .view .hint,body.simple .afilt,body.simple .note,body.simple #attClear,body.simple #nav [data-go=hist],body.simple #nav [data-go=set]{display:none!important}
-body.simple #nav{grid-template-columns:repeat(4,minmax(0,1fr))}body.simple #bsort{display:none!important}body.simple .bench{grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:1.9rem;max-height:6.1rem;gap:.25rem}body.simple #tray.big .bench{max-height:42vh}.chip.wc{display:flex;align-items:center;gap:.25rem;padding:0 .3rem;box-shadow:none}.chip.wc b{font-size:.8125rem;flex:1;min-width:0}.chip.wc .wn{flex:none;display:inline-grid;place-items:center;min-width:1.15rem;height:1.15rem;border-radius:.6rem;font-size:.6875rem;font-weight:800;background:var(--line);color:var(--mute)}.chip.wc.w1 .wn{background:#fde68a;color:#78350f}.chip.wc.w2{background:light-dark(#fee2e2,#4a1212);border-color:#d92d20}.chip.wc.w2 .wn{background:#d92d20;color:#fff}.chip.wc.na{opacity:.5}.bhead .sim{white-space:nowrap;margin-left:auto}
+body.simple #nav{grid-template-columns:repeat(5,minmax(0,1fr))}body.simple #bsort{display:none!important}body.simple .bench{grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:1.9rem;max-height:6.1rem;gap:.25rem}body.simple #tray.big .bench{max-height:42vh}.chip.wc{display:flex;align-items:center;gap:.25rem;padding:0 .3rem;box-shadow:none}.chip.wc b{font-size:.8125rem;flex:1;min-width:0}.chip.wc .wn{flex:none;display:inline-grid;place-items:center;min-width:1.15rem;height:1.15rem;border-radius:.6rem;font-size:.6875rem;font-weight:800;background:var(--line);color:var(--mute)}.chip.wc.w1 .wn{background:#fde68a;color:#78350f}.chip.wc.w2{background:light-dark(#fee2e2,#4a1212);border-color:#d92d20}.chip.wc.w2 .wn{background:#d92d20;color:#fff}.chip.wc.na{opacity:.5}.bhead .sim{white-space:nowrap;margin-left:auto}
 body.simple .m.lt,body.simple .m.gn{visibility:hidden}
 body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}body.simple .m.ks::after{content:'대';font-size:.625rem}
 .simbar{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;margin:0 0 .5rem}
@@ -335,7 +335,7 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 </style>
 </head>
 <body>
-<header class="ghead" id="ghead"><h1><span>골고</span><small id="gwho"></small></h1><nav class="gtabs" id="gtabs" aria-label="골고 화면"><a href="checkin.html" data-ci>출석</a><a href="member.html?tab=game">경기</a><a href="member.html?tab=mine">내 카드</a><a href="member.html?tab=admin">관리</a><a class="on" href="#">로테이션</a></nav></header>
+<header class="ghead" id="ghead"><h1><span>골고</span><small id="gwho"></small></h1><nav class="gtabs" id="gtabs" aria-label="골고 화면"><a href="checkin.html" data-ci>출석</a><a href="member.html?tab=game">경기</a><a href="member.html?tab=mine">내 카드</a><a class="on" href="#">운영</a></nav></header><!-- [수정] 2026-11-26 관리·로테이션을 '운영' 하나로(관리 화면은 아래쪽 '촬영' 칸) -->
 <main class="band"><div class="wrap">
 
 <section class="view" data-view="att" id="attBox">
@@ -437,6 +437,8 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 <!-- [삭제] 2026-11-26 회원별 누적(여러 경기 합계) 표: 로테이션 공평은 한 경기 안의 쿼터만 보므로 뺐다(사용자) -->
 </section>
 
+<!-- [추가] 2026-11-26 촬영·관리: 회원 화면의 관리(촬영 폰·이름 맞추기·쿼터 영상 등)를 이 페이지 안에 붙여 연다(작전판과 오갈 때 다시 불러오지 않게) -->
+<section class="view" data-view="cam" hidden><iframe id="camFrame" title="촬영·관리" style="display:block;width:100%;border:0;background:var(--bg)"></iframe></section>
 <section class="view" data-view="set" hidden>
 <h2>설정</h2>
 <div class="btns" style="margin:0 0 .5rem"><button class="pri" id="toSimple2">간편 모드로 보기</button></div>
@@ -495,6 +497,7 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 <button data-go="board"><b>작전판</b><small id="nBoard"></small></button>
 <button data-go="stat"><b>현황</b><small id="nStat"></small></button>
 <button data-go="hist"><b>기록</b><small id="nHist"></small></button>
+<button data-go="cam"><b>촬영</b><small>관리</small></button>
 <button data-go="set"><b>설정</b><small id="nSet">&nbsp;</small></button>
 <button class="sim" id="toFull"><b>전체 모드</b><small>모든 기능</small></button>
 </nav>
@@ -726,12 +729,17 @@ function autoAll(){
 let toastT=null;
 function say(t){const m=$('msg');m.textContent=t;m.classList.toggle('show',!!t);clearTimeout(toastT);if(t)toastT=setTimeout(()=>m.classList.remove('show'),3500)}
 function setView(v){
-  if(!['att','board','stat','hist','set'].includes(v))v='board';S.vt=v;
+  if(!['att','board','stat','hist','cam','set'].includes(v))v='board';S.vt=v;
   document.querySelectorAll('.view').forEach(x=>x.hidden=x.dataset.view!==v);
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.go===v));
   document.body.classList.toggle('boardv',v==='board');
+  if(v==='cam')camFrameOpen();
   save();
 }
+// [추가] 2026-11-26 촬영·관리 칸: 처음 열 때만 불러오고, 화면 높이에 맞춘다
+function camFrameOpen(){const f=$('camFrame');if(!f)return;if(!f.src){f.src='member.html?tab=admin&embed=1';f.addEventListener('load',camFrameSize)}camFrameSize();setTimeout(camFrameSize,300)}
+function camFrameSize(){const f=$('camFrame');if(!f||f.closest('.view').hidden)return;const nav=$('nav').getBoundingClientRect().height||0;f.style.height=Math.max(320,innerHeight-f.getBoundingClientRect().top-nav-4)+'px'}
+addEventListener('resize',()=>{try{camFrameSize()}catch(e){}});
 const isSel=(t,i)=>sel&&sel.t===t&&sel.i===i;
 function place(t,i,id){const q=S.q[S.cur],w=where(q,id);if(w)sl(q,w.t)[w.k]=null;sl(q,t)[i]=id}
 
@@ -1684,7 +1692,7 @@ $('gtabs').addEventListener('click',e=>{const a=e.target.closest('a');if(!a)retu
 $('toSimple2').addEventListener('click',()=>setSimple(true));
 try{document.body.classList.toggle('simple',localStorage.getItem('jogi-simple')!=='0')}catch(e){document.body.classList.add('simple')}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b){setView(b.dataset.go);try{window.scrollTo(0,0)}catch(err){}}});
-setView(S.vt||(S.players.some(p=>p.here)?'board':'att'));
+setView((/[?&]v=(att|board|stat|hist|cam|set)\b/.exec(location.search)||[])[1]||S.vt||(S.players.some(p=>p.here)?'board':'att'));   // [수정] 2026-11-26 ?v= 로 첫 칸
 render();
 }
 </script>

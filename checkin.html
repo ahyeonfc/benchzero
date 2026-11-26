@@ -97,7 +97,8 @@ function render(){
   // 운영진 기기면 회원 화면과 같은 탭 줄에 관리·로테이션도 보여 준다(회원 화면이 기억해 둔 값)
   let staff='';try{staff=localStorage.getItem('gg-staff')||''}catch(e){}
   $('tabs').innerHTML='<a class="on" href="#">출석</a><a href="member.html?tab=game">경기</a><a href="member.html?tab=mine">내 카드</a>'+
-    (staff?'<a href="member.html?tab=admin">관리</a>':'')+(staff==='rot'?'<a href="index.html?admin">로테이션</a>':'');
+    // [수정] 2026-11-26 관리·로테이션을 '운영' 하나로(관리 화면은 운영의 아래쪽 '촬영' 칸)
+    (staff?`<a href="${staff==='rot'?'index.html?admin':'index.html?admin&v=cam'}">운영</a>`:'');
   if(!ST.conf){app.innerHTML='<div class="card"><h2>링크가 필요해요</h2><p>운영자가 보낸 <b>출석 링크</b>나 운동장의 <b>QR코드</b>로 들어와 주세요.</p></div>';return}
   if(!P){app.innerHTML='<p class="ld">'+(ST.err?esc(ST.err):'불러오는 중…')+'</p>';return}
   // 서비스 이름을 골고로 바꿈(2026-11-23). 예전에 저장된 제목 "벤치제로"는 골고로 보여 준다
