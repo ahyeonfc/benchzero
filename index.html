@@ -368,7 +368,7 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 <div class="qtools"><button class="pri" id="autoBtn">자동</button></div>
 <div class="startbar" id="startBar"></div>
 <details class="more" id="moreBox"><summary aria-label="더보기">⋯</summary><div class="menu">
-<button id="toSimple">간편 모드로 보기</button>
+<button id="toSimple" style="display:none">간편 모드로 보기</button><!-- [수정] 2026-11-26 간편 모드 없앰(사용자) -->
 <button id="toMember">회원 화면 (영상·경기 분석)</button>
 <button class="photoIn" id="photoMenuCam" hidden>말판 사진 찍기</button>
 <button class="photoIn" id="photoMenu" hidden>말판 사진 앨범에서 고르기</button>
@@ -441,7 +441,7 @@ body.simple .m.ks{font-size:0;border:1.5px solid var(--mute);color:var(--mute)}b
 <section class="view" data-view="cam" hidden><iframe id="camFrame" title="촬영·관리" style="display:block;width:100%;border:0;background:var(--bg)"></iframe></section>
 <section class="view" data-view="set" hidden>
 <h2>설정</h2>
-<div class="btns" style="margin:0 0 .5rem"><button class="pri" id="toSimple2">간편 모드로 보기</button></div>
+<div class="btns" style="display:none"><button class="pri" id="toSimple2">간편 모드로 보기</button></div><!-- [수정] 2026-11-26 간편 모드 없앰 -->
 <details class="sec" open><summary>경기 일정·설정</summary><div>
 <div class="evsel"></div>
 <p class="cist" id="gInfo" style="margin:0 0 .5rem"></p>
@@ -1690,7 +1690,9 @@ $('gtabs').addEventListener('click',e=>{const a=e.target.closest('a');if(!a)retu
   if(a.classList.contains('on')){e.preventDefault();return}
   if(a.hasAttribute('data-ci')){e.preventDefault();let u='checkin.html';try{ciNorm();if(S.ci.code)u=ciLink()}catch(_){}location.href=u}});
 $('toSimple2').addEventListener('click',()=>setSimple(true));
-try{document.body.classList.toggle('simple',localStorage.getItem('jogi-simple')!=='0')}catch(e){document.body.classList.add('simple')}
+// [수정] 2026-11-26 간편 모드 없앰(의미가 없어서, 사용자): 늘 전체 화면
+// try{document.body.classList.toggle('simple',localStorage.getItem('jogi-simple')!=='0')}catch(e){document.body.classList.add('simple')}
+document.body.classList.remove('simple');
 document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b){setView(b.dataset.go);try{window.scrollTo(0,0)}catch(err){}}});
 setView((/[?&]v=(att|board|stat|hist|cam|set)\b/.exec(location.search)||[])[1]||S.vt||(S.players.some(p=>p.here)?'board':'att'));   // [수정] 2026-11-26 ?v= 로 첫 칸
 render();

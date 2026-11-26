@@ -1,5 +1,5 @@
 /* 골고 - 오프라인 캐시 */
-const VER='goalgo-v29';   // 관리·로테이션을 운영 하나로, 촬영 칸(2026-11-26)
+const VER='goalgo-v30';   // 간편 모드 없앰(2026-11-26)
 const SHELL=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','checkin.html','member.html','qrcode.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(VER).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==VER).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
