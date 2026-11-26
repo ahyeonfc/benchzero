@@ -189,7 +189,7 @@ body.dragging{cursor:grabbing}
      펼쳤을 때 남은 높이를 작전판과 벤치가 반씩 나누고 벤치는 그 안에서 스크롤한다(작전판을 보면서 선수를 넣도록) */
   .pitchwrap{overflow:hidden}
   .view.board #tray.big{flex:0 1 50%;display:flex;flex-direction:column;min-height:0}
-  .view.board #tray.big .bench{flex:1;min-height:0;max-height:none;overflow:auto}
+  .view.board #tray.big .bench{flex:1;min-height:0;max-height:none;overflow:auto;grid-auto-rows:max-content;align-content:start}   /* 칸이 글자보다 작게 눌리지 않게(이름이 겹쳐 안 보이던 문제) */
 }
 /* 넓은 화면: 작전판 + 오른쪽 벤치 */
 @media(min-width:860px){
