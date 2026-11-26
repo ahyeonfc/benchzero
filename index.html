@@ -989,7 +989,8 @@ function renderHist(){
   // [추가] 2026-11-26 달력: 처음에는 가장 최근 경기의 달·날짜
   if(!hMon)hMon=(S.games[0]?S.games[0].date:today()).slice(0,7);
   if(hDay===null){hDay=S.games[0]?S.games[0].date:'';const G=S.games.filter(g=>g.date===hDay);if(G.length===1)hSel=G[0].gid}
-  $('nHist').textContent=`${S.games.length}경기`;
+  // [수정] 2026-11-26 전체 경기 수는 계속 늘기만 해서 가장 최근 경기 날짜로(예: 최근 11/29)
+  $('nHist').textContent=S.games[0]?`최근 ${+S.games[0].date.slice(5,7)}/${+S.games[0].date.slice(8,10)}`:'';
   $('hcal').innerHTML=histCal();
   // [삭제] 2026-11-26 회원별 누적(여러 경기 합계) 계산·표는 뺐다(로테이션 공평은 한 경기 안만 본다)
   // [수정] 2026-11-26 달력에서 고른 날짜의 경기만(그날 경기가 하나면 바로 펼침)
